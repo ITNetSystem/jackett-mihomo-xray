@@ -25,6 +25,7 @@ proxies:
     port: 10851
     udp: true
 PROXIES
+[ -n "$PROVIDERS_BLOCK" ] || PROVIDERS_LIST=""
 add_provider JACKETT_XRAY_TEST file "$WORKDIR/jackett-xray-test.yaml" false
 fi
 HOOK
