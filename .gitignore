@@ -1,0 +1,6 @@
+private/
+*.tar
+*.tar.gz
+xray.json
+mihomo.yaml
+.env
