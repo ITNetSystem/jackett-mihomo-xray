@@ -1,3 +1,5 @@
+> **АРХИВ.** Это описание старых образов. Для текущей сборки используйте [главную инструкцию](README.md).
+
 # Experimental Mihomo + Xray for MikroTik
 
 Mihomo 1.19.32 plus Xray 26.10.10, ARM64 and AMD64. Xray provides MASQUE/XDRIVE; Mihomo selects local SOCKS proxies. This is a separate experimental container, not a replacement for a working production container.

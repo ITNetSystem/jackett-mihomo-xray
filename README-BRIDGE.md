@@ -11,7 +11,6 @@
 |---|---|
 | `SUB1`, `SUB2`, … | HTTP/HTTPS URL подписки: raw/base64 URI, полный Xray JSON или Mihomo YAML |
 | `SRV1`, `SRV2`, `SRV2_TEST`, … | Отдельная ссылка, Xray JSON или URL подписки |
-| `XRAY_JSON1`, `XRAY_JSON2`, … | Полный клиентский Xray JSON / JSON outbound либо URL такого JSON |
 | `PROVIDER_INTERVAL` | Обновление источников в секундах; по умолчанию 3600, минимум 60 |
 | `SUB_USER_AGENT` | По умолчанию `Happ/1.0 Jackett-Bridge`, чтобы получать исходные ссылки вместо Clash YAML |
 | `HWID` | HWID для ограниченных подписок; если не задан, сохраняется в `/etc/mihomo/.hwid` |
@@ -23,7 +22,7 @@
 | `WORKDIR` | Каталог конфигурации; по умолчанию `/etc/mihomo` |
 | `CONFIG`, `TUN`, `IPTABLES`, `DNS_*`, `HEALTH_CHECK_*` | Исходная обработка шаблонов и сети wiktorbgu сохранена |
 
-Отключенные ENV RouterOS не передаются контейнеру. Приватный `xray.json` для обычной подписки не нужен. `JACKETT_XRAY_TEST` для этой сборки не требуется.
+Отключенные ENV RouterOS не передаются контейнеру. Для обычной подписки достаточно SUB/SRV, без загрузки файлов. `JACKETT_XRAY_TEST` для этой сборки не требуется.
 
 ## Протоколы и форматы
 
@@ -47,9 +46,9 @@
 
 MTProto — Telegram-прокси, а не VPN для произвольных приложений. Он здесь не эмулируется. Неподдерживаемые ядрами протоколы эта сборка не изобретает. Реальный gRPC/WS/mKCP зависит также от сервера: существующие серверные инбаунды не создаются автоматически.
 
-## Быстрый тест на домашнем RB5009
+## Настройка на вашем MikroTik
 
-Рабочий контейнер и его папку `/containers/mihomo` не менять. У вашего тестового интерфейса `veth-aportnov-test` адрес 172.31.203.4, **шлюз 172.31.203.254**, DNS 1.1.1.1.
+Рабочий контейнер и его папку `/containers/mihomo` не менять. В командах используется ваш интерфейс **`veth-jackett`**. Проверьте его адрес и шлюз перед запуском. Для сети 172.31.203.0/24 ваш шлюз — **172.31.203.254**, DNS 1.1.1.1.
 
 Скопировать SUB1 без вывода приватной ссылки:
 
@@ -65,32 +64,32 @@ MTProto — Telegram-прокси, а не VPN для произвольных �
 
 Настройки UI/LOG_LEVEL копируются таким же способом. Не копируйте отключенные SRV, если они не нужны. Для подписки с лимитом устройств необходимо сохранить HWID рабочего клиента; домашняя подписка сейчас без HWID-лимита.
 
-Обновить только существующий тестовый контейнер:
+Обновить существующий контейнер на `veth-jackett` (его ENV и mounts сохраняются):
 
 ```routeros
-/container/stop [/container/find where interface=veth-aportnov-test]
-/container/set [/container/find where interface=veth-aportnov-test] remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 dns=1.1.1.1
-/container/repull [/container/find where interface=veth-aportnov-test]
+/container/stop [/container/find where interface=veth-jackett]
+/container/set [/container/find where interface=veth-jackett] remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 dns=1.1.1.1
+/container/repull [/container/find where interface=veth-jackett]
 ```
 
 Дождаться завершения downloading/extracting в `/container/print`, затем:
 
 ```routeros
-/container/start [/container/find where interface=veth-aportnov-test]
+/container/start [/container/find where interface=veth-jackett]
 ```
 
-В RouterOS с `list` для mounts используйте `mountlists`, а не старый `mounts`. Старый read-only mount `/etc/jackett-test` можно оставить, но новая сборка его не читает. Нужен отдельный writable mount `/containers/mihomo-test` → `/etc/mihomo`, который уже создан. Конфигурации/кеш с секретами находятся в `.jackett-xray` внутри него: не публикуйте эту папку.
+В RouterOS с `list` для mounts используйте `mountlists`, а не старый `mounts`. Нужен отдельный writable mount `/containers/mihomo-test` → `/etc/mihomo`, Перед новой установкой создайте этот mountlist; при обновлении существующие mounts сохраняются. Конфигурации/кеш с секретами находятся в `.jackett-xray` внутри него: не публикуйте эту папку.
 
-Веб-панель: `http://172.31.203.4:9090/ui/#/setup?hostname=172.31.203.4&port=9090&secret=`. Если задан UI_SECRET, введите его в настройках подключения. После загрузки будет провайдер `JACKETT_XRAY`, а названия подключений Xray начинаются с `[Xray]`. Нативные подключения сохраняют свой тип, например TUIC.
+Веб-панель: `http://IP-КОНТЕЙНЕРА:9090/ui/`. В настройках подключения укажите IP интерфейса `veth-jackett`, порт 9090 и ваш API secret. Если задан UI_SECRET, введите его в настройках подключения. После загрузки будет провайдер `JACKETT_XRAY`, а названия подключений Xray начинаются с `[Xray]`. Нативные подключения сохраняют свой тип, например TUIC.
 
-Для явного выбора: SELECTOR → MANUAL → нужная локация. Проверка браузером/компьютером через HTTP proxy `172.31.203.4:1080`. Веб-панель скачивается при запуске по EXTERNAL_UI_URL; для этого нужны работающие шлюз/DNS/интернет. Доступность страницы API не означает, что UI уже скачан.
+Для явного выбора: SELECTOR → MANUAL → нужная локация. Проверка браузером/компьютером через HTTP proxy `IP-КОНТЕЙНЕРА:1080`. Веб-панель скачивается при запуске по EXTERNAL_UI_URL; для этого нужны работающие шлюз/DNS/интернет. Доступность страницы API не означает, что UI уже скачан.
 
 ## Новая установка
 
 При уже подготовленных отдельном veth, ENV и writable mountlist:
 
 ```routeros
-/container/config/set registry-url=https://ghcr.io; /container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=mihomo-test interface=veth-aportnov-test root-dir=/containers/jackett-aportnov-root mountlists=aportnov-test-config dns=1.1.1.1 logging=yes start-on-boot=no
+/container/config/set registry-url=https://ghcr.io; /container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=mihomo-test interface=veth-jackett root-dir=/containers/jackett-root mountlists=aportnov-test-config dns=1.1.1.1 logging=yes start-on-boot=no
 ```
 
 Пример одной ссылки:
@@ -107,7 +106,7 @@ MTProto — Telegram-прокси, а не VPN для произвольных �
 
 При использовании собственного шаблона он должен содержать PROVIDERS_BLOCK/PROVIDERS_LIST и направлять трафик в соответствующие группы. Кастомные ручные конфиги без этих вставок автоматически не дописываются. Правила маршрутизации из полной YAML-подписки не импортируются: используются правила исходного шаблона MikroTik/Mihomo.
 
-Откат теста: остановить тестовый контейнер, вернуть тег `mikrotik-xray26.10.10`, repull, включить прежний JACKETT_XRAY_TEST=1 и оставить xray.json на месте. Если пользовательский каталог сохранён, удалите только `/containers/mihomo-test/user_sh/jackett-all-xray.sh` перед запуском старого образа: он иначе будет ссылаться на уже отсутствующий адаптер. Рабочий контейнер остаётся доступен весь тест.
+Перед обновлением сохраните прежний тег образа и настройки контейнера. При откате восстановите прежний тег и ENV. В сохранённом каталоге конфигурации удалите только `user_sh/jackett-all-xray.sh` перед запуском старого образа: этот hook относится к новому адаптеру.
 
 ## Проверено
 

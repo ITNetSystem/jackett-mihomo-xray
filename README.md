@@ -2,7 +2,7 @@
 
 Актуальный образ: **`ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1`**.
 
-**Mihomo 1.19.32 + Xray 26.10.10**, ARM64 (включая RB5009) и AMD64. Настройка через ENV: добавьте подписку в `SUB1` — локальные конфигурации Xray создаются автоматически. Ручной `xray.json` для обычной подписки не нужен.
+**Mihomo 1.19.32 + Xray 26.10.10**, ARM64 (включая RB5009) и AMD64. Настройка через ENV: добавьте подписку в `SUB1` — локальные конфигурации Xray создаются автоматически. Все конфигурации создаются из ENV автоматически.
 
 ## SUB2, SRV1 и SRV2 поддерживаются
 
@@ -12,7 +12,6 @@
 |---|---|
 | `SUB1`, `SUB2`, `SUB3`, … | Ссылка HTTP/HTTPS на подписку |
 | `SRV1`, `SRV2`, `SRV3`, … | Отдельная ссылка подключения, полный Xray JSON или URL источника |
-| `XRAY_JSON1`, `XRAY_JSON2`, … | Полный клиентский Xray JSON или его URL |
 | `EXTERNAL_UI_URL`, `LOG_LEVEL`, `UI_SECRET` | Настройки веб-панели, журнала и пароля API |
 | `PROVIDER_INTERVAL` | Обновление подписок: по умолчанию 3600 секунд, минимум 60 |
 | `HWID` | Идентификатор для подписок с ограничением устройств |
@@ -32,10 +31,10 @@ Xray обслуживает VLESS, VMess, Trojan, Shadowsocks, SOCKS/HTTP и д�
 Для уже подготовленных отдельного veth, ENV-списка и writable mountlist:
 
 ```routeros
-/container/config/set registry-url=https://ghcr.io; /container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=mihomo-test interface=veth-aportnov-test root-dir=/containers/jackett-aportnov-root mountlists=aportnov-test-config dns=1.1.1.1 logging=yes start-on-boot=no
+/container/config/set registry-url=https://ghcr.io; /container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=mihomo-test interface=veth-jackett root-dir=/containers/jackett-root mountlists=aportnov-test-config dns=1.1.1.1 logging=yes start-on-boot=no
 ```
 
-На домашнем тестовом интерфейсе: IP `172.31.203.4/24`, шлюз **`172.31.203.254`**. Порты: прокси **1080**, API/веб-панель **9090**. Начните с отдельного контейнера и отдельной папки конфигурации. Не запускайте два контейнера на одном veth или с одинаковым root-dir.
+В команде указан ваш интерфейс **`veth-jackett`**. Для вашей сети 172.31.203.0/24 шлюз — **`172.31.203.254`**; IP контейнера проверьте в настройках veth. Порты: прокси **1080**, API/веб-панель **9090**. Начните с отдельного контейнера и отдельной папки конфигурации. Не запускайте два контейнера на одном veth или с одинаковым root-dir.
 
 ## Проверено
 
