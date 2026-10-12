@@ -1,61 +1,55 @@
-# Experimental Mihomo + Xray for MikroTik
+# Jackett Mihomo + Xray для MikroTik
 
-Mihomo 1.19.32 plus Xray 26.10.10, ARM64 and AMD64. Xray provides MASQUE/XDRIVE; Mihomo selects local SOCKS proxies. This is a separate experimental container, not a replacement for a working production container.
+Актуальный образ: **`ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1`**.
 
-No customer credentials, subscription URLs or server certificates are included. Mount your private xray.json and mihomo.yaml under /etc/jackett-test. The image stops if either process exits.
+**Mihomo 1.19.32 + Xray 26.10.10**, ARM64 (включая RB5009) и AMD64. Настройка через ENV: добавьте подписку в `SUB1` — локальные конфигурации Xray создаются автоматически. Ручной `xray.json` для обычной подписки не нужен.
 
-## Publishing
+## SUB2, SRV1 и SRV2 поддерживаются
 
-Push this directory to the main branch, or run the Publish workflow. GitHub Actions uses its built-in GITHUB_TOKEN with packages:write; no personal token needs to be placed in repository files. Workflow files must be enabled/authorized for this repository.
+Можно одновременно использовать несколько источников; их подключения объединяются в провайдер `JACKETT_XRAY`.
 
-After the first successful publication set the package visibility to Public in GitHub Packages settings if anonymous pulling is required. Public repository visibility alone does not make the new GHCR package public.
+| ENV | Значение |
+|---|---|
+| `SUB1`, `SUB2`, `SUB3`, … | Ссылка HTTP/HTTPS на подписку |
+| `SRV1`, `SRV2`, `SRV3`, … | Отдельная ссылка подключения, полный Xray JSON или URL источника |
+| `XRAY_JSON1`, `XRAY_JSON2`, … | Полный клиентский Xray JSON или его URL |
+| `EXTERNAL_UI_URL`, `LOG_LEVEL`, `UI_SECRET` | Настройки веб-панели, журнала и пароля API |
+| `PROVIDER_INTERVAL` | Обновление подписок: по умолчанию 3600 секунд, минимум 60 |
+| `HWID` | Идентификатор для подписок с ограничением устройств |
 
-## MikroTik installation
+Поддерживаются также имена с суффиксом, например `SRV2_TEST`. Отключённые ENV в RouterOS контейнеру не передаются. Все непустые SUB/SRV обрабатываются совместно, поэтому не добавляйте один источник повторно без необходимости. Максимум — 64 Xray-подключения. Оригинальные шаблоны, сетевые ENV и веб-панель wiktorbgu сохранены; ограничения кастомных шаблонов описаны в инструкции.
 
-For repository ITNetSystem/jackett-mihomo-xray, after image publication and public visibility, use the following single line. It assumes the test veth, configuration mount and usb1 disk already exist:
+## Какие подключения обслуживает сборка
 
-```routeros
-/container/config/set registry-url=https://ghcr.io; /container/add remote-image=itnetsystem/jackett-mihomo-xray:1.19.32-xray26.10.10 interface=veth-aportnov-test root-dir=usb1/jackett-aportnov-root mounts=aportnov-test-config logging=yes start-on-boot=no
-```
+Xray обслуживает VLESS, VMess, Trojan, Shadowsocks, SOCKS/HTTP и другие поддерживаемые им протоколы. Для VLESS URI реализованы TCP/RAW, **gRPC**, XHTTP, WebSocket, HTTPUpgrade и mKCP. MASQUE, XDRIVE и расширенные настройки передаются полным Xray JSON. Нативные Mihomo-конфигурации остаются в Mihomo, включая TUIC и остальные реализованные в его ядре типы.
 
-Changing registry-url also changes the default registry for future container pulls. Existing containers keep running. Start the new container only after extraction completes. Do not stop the old one during initial testing.
+Поддержка ядром и поддержка формата ссылки — разные вещи: неизвестные параметры URI отклоняются, а расширенные настройки нужно передавать через JSON. Серверные инбаунды сборка автоматически не создаёт.
 
-The new router needs outbound access to the test server ports: TCP 8450 (MASQUE HTTP/2) and TCP 8451 (XDRIVE HTTPS storage). The subscription-only VM does not need these ports in normal operation.
+## Установка и обновление
 
-Image version tag is explicit; do not replace production with an automatically changing latest image.
+**[Полная инструкция: ENV, установка на RB5009, обновление тестового контейнера и откат](README-BRIDGE.md).**
 
-## Verification status
-
-MASQUE and XDRIVE both passed HTTPS 204 tests through Mihomo on AMD64 from VPN1 to VPN2. ARM64 image builds successfully; native RouterOS runtime has not yet been verified.
-
-## References
-
-- https://manual.mikrotik.com/docs/containers/
-- https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
-- https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images
-
-## Environment variables
-
-Currently supported: XRAY_CONFIG and MIHOMO_CONFIG (paths to mounted configuration files). LOG_LEVEL, EXTERNAL_UI_URL, SUB1, SRV1 and SRV2 from third-party MikroTik wrappers are not automatically interpreted by this image. Providers, UI and log level must be specified in mihomo.yaml. Do not treat this image as a drop-in replacement for such wrappers until their initialization behavior is ported and tested.
-
-## MikroTik wrapper-compatible variant
-
-Use tag `mikrotik-xray26.10.10` for the MikroTik-compatible variant. It inherits the complete original wiktorbgu/mihomo-mikrotik image at the fixed digest `sha256:3140540997abafa6bc649ae0cebb42b0e3ffbec9eb1d3cd601edde9d355eb733`, including the original entrypoint, templates, ENV defaults, TUN setup, subscription processing and UI. The upstream binaries and template semantics are retained; this variant is distinct from the minimal image described above.
-
-`SUB1`, `SUB2`, `SRV1`, `SRV2`, `EXTERNAL_UI_URL`, `LOG_LEVEL` and other upstream ENV settings remain handled by the original entrypoint/templates. Existing disabled RouterOS ENV entries remain disabled. Existing customized configurations still determine which ENV/template features apply.
-
-By default Xray is disabled and the upstream entrypoint runs unchanged. For the separate test set `JACKETT_XRAY_TEST=1` and mount private `xray.json` at `/etc/jackett-test/xray.json`. The original template user_sh hook adds the two local SOCKS test proxies to the file provider `JACKETT_XRAY_TEST`. Custom templates must use PROVIDERS_BLOCK/PROVIDERS_LIST for those extra proxies to appear. The default group can auto-select these test proxies when enabled; use a separate container and separate writable /etc/mihomo mount, never the production container's directory.
-
-For this variant the upstream mixed proxy port defaults to **1080** (minimal image uses 7890); UI/API defaults to **9090**. Normal ENV subscriptions do not require the test Xray mount when JACKETT_XRAY_TEST is unset. Preserve the existing API secret/HWID and mounts when migrating; changing storage may generate a new HWID.
-
-After publication, with a prepared separate veth/mount and an ENV list named mihomo-test:
+Для уже подготовленных отдельного veth, ENV-списка и writable mountlist:
 
 ```routeros
-/container/config/set registry-url=https://ghcr.io; /container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-xray26.10.10 envlists=mihomo-test interface=veth-aportnov-test root-dir=usb1/jackett-aportnov-root mounts=aportnov-test-config logging=yes start-on-boot=no
+/container/config/set registry-url=https://ghcr.io; /container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=mihomo-test interface=veth-aportnov-test root-dir=/containers/jackett-aportnov-root mountlists=aportnov-test-config dns=1.1.1.1 logging=yes start-on-boot=no
 ```
 
-The ENV list should be copied for testing, not edited on the running production container. Make sure the MikroTik test interface uses ordinary WAN routing so it does not loop back into the current proxy.
+На домашнем тестовом интерфейсе: IP `172.31.203.4/24`, шлюз **`172.31.203.254`**. Порты: прокси **1080**, API/веб-панель **9090**. Начните с отдельного контейнера и отдельной папки конфигурации. Не запускайте два контейнера на одном veth или с одинаковым root-dir.
 
-## Новый мост подписок через ENV
+## Проверено
 
-Для передачи обычных SUB/SRV подключений в Xray используйте отдельный тег `mikrotik-all-xray26.10.10-v1`. Настройка через ENV без приватного xray.json, правила форматов, команды для RB5009 и проверки описаны в [README-BRIDGE.md](README-BRIDGE.md). Прежний `mikrotik-xray26.10.10` обслуживает через Xray только два тестовых протокола; это разные сборки.
+- Все 8 TCP/XHTTP подключений домашней подписки прошли внешний HTTPS-тест через Xray 26.10.10, включая каскады Гонконга.
+- Автообновление SUB1 работает без перезапуска контейнера.
+- Смешанный список Xray и нативного TUIC сохраняет типы подключений.
+- Опубликованы ARM64 и AMD64. Новую сборку ещё нужно проверить непосредственно на RB5009.
+
+## Предыдущие сборки
+
+| Тег | Назначение |
+|---|---|
+| `mikrotik-all-xray26.10.10-v1` | **Текущая сборка:** SUB/SRV через адаптер Xray, нативные типы Mihomo сохраняются |
+| `mikrotik-xray26.10.10` | Предыдущая: обычные подписки в Mihomo, два тестовых протокола через Xray |
+| `1.19.32-xray26.10.10`, `experimental` | Первоначальная минимальная сборка с ручными файлами конфигурации |
+
+[Архив описания прежних сборок](README-LEGACY.md). Инструкции из архива не относятся к текущему тегу.
