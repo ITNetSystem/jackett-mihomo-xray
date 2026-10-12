@@ -37,3 +37,21 @@ MASQUE and XDRIVE both passed HTTPS 204 tests through Mihomo on AMD64 from VPN1 
 ## Environment variables
 
 Currently supported: XRAY_CONFIG and MIHOMO_CONFIG (paths to mounted configuration files). LOG_LEVEL, EXTERNAL_UI_URL, SUB1, SRV1 and SRV2 from third-party MikroTik wrappers are not automatically interpreted by this image. Providers, UI and log level must be specified in mihomo.yaml. Do not treat this image as a drop-in replacement for such wrappers until their initialization behavior is ported and tested.
+
+## MikroTik wrapper-compatible variant
+
+Use tag `mikrotik-xray26.10.10` for the MikroTik-compatible variant. It inherits the complete original wiktorbgu/mihomo-mikrotik image at the fixed digest `sha256:3140540997abafa6bc649ae0cebb42b0e3ffbec9eb1d3cd601edde9d355eb733`, including the original entrypoint, templates, ENV defaults, TUN setup, subscription processing and UI. The upstream binaries and template semantics are retained; this variant is distinct from the minimal image described above.
+
+`SUB1`, `SUB2`, `SRV1`, `SRV2`, `EXTERNAL_UI_URL`, `LOG_LEVEL` and other upstream ENV settings remain handled by the original entrypoint/templates. Existing disabled RouterOS ENV entries remain disabled. Existing customized configurations still determine which ENV/template features apply.
+
+By default Xray is disabled and the upstream entrypoint runs unchanged. For the separate test set `JACKETT_XRAY_TEST=1` and mount private `xray.json` at `/etc/jackett-test/xray.json`. The original template user_sh hook adds the two local SOCKS test proxies to the file provider `JACKETT_XRAY_TEST`. Custom templates must use PROVIDERS_BLOCK/PROVIDERS_LIST for those extra proxies to appear. The default group can auto-select these test proxies when enabled; use a separate container and separate writable /etc/mihomo mount, never the production container's directory.
+
+For this variant the upstream mixed proxy port defaults to **1080** (minimal image uses 7890); UI/API defaults to **9090**. Normal ENV subscriptions do not require the test Xray mount when JACKETT_XRAY_TEST is unset. Preserve the existing API secret/HWID and mounts when migrating; changing storage may generate a new HWID.
+
+After publication, with a prepared separate veth/mount and an ENV list named mihomo-test:
+
+```routeros
+/container/config/set registry-url=https://ghcr.io; /container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-xray26.10.10 envlists=mihomo-test interface=veth-aportnov-test root-dir=usb1/jackett-aportnov-root mounts=aportnov-test-config logging=yes start-on-boot=no
+```
+
+The ENV list should be copied for testing, not edited on the running production container. Make sure the MikroTik test interface uses ordinary WAN routing so it does not loop back into the current proxy.

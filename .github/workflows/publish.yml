@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [Dockerfile, start.sh, .dockerignore, .github/workflows/publish.yml]
+    paths: [Dockerfile, start.sh, Dockerfile.mikrotik, mikrotik-start.sh, .dockerignore, .github/workflows/publish.yml]
 permissions:
   contents: read
   packages: write
@@ -38,3 +38,17 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=Experimental Mihomo 1.19.32 and Xray 26.10.10; configurations mounted separately
+
+      - name: Publish MikroTik ENV-compatible variant
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.mikrotik
+          platforms: linux/arm64,linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ steps.image.outputs.name }}:mikrotik-xray26.10.10
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
