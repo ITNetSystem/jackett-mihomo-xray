@@ -3,3 +3,8 @@
 !start.sh
 !Dockerfile.mikrotik
 !mikrotik-start.sh
+
+!Dockerfile.bridge
+!bridge.py
+!exec-mihomo.py
+!bridge-start.sh

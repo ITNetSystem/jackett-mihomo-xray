@@ -4,3 +4,7 @@ private/
 xray.json
 mihomo.yaml
 .env
+
+__pycache__/
+*.pyc
+.jackett-xray/

@@ -55,3 +55,7 @@ After publication, with a prepared separate veth/mount and an ENV list named mih
 ```
 
 The ENV list should be copied for testing, not edited on the running production container. Make sure the MikroTik test interface uses ordinary WAN routing so it does not loop back into the current proxy.
+
+## Новый мост подписок через ENV
+
+Для передачи обычных SUB/SRV подключений в Xray используйте отдельный тег `mikrotik-all-xray26.10.10-v1`. Настройка через ENV без приватного xray.json, правила форматов, команды для RB5009 и проверки описаны в [README-BRIDGE.md](README-BRIDGE.md). Прежний `mikrotik-xray26.10.10` обслуживает через Xray только два тестовых протокола; это разные сборки.

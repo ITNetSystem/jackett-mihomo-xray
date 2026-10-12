@@ -1,0 +1,48 @@
+import base64
+import copy
+import json
+import unittest
+from bridge import Invalid, local_config, parse_payload, uri_profile
+
+ID='11111111-1111-4111-8111-111111111111'
+class ConversionTests(unittest.TestCase):
+    def vless(self,q):
+        return uri_profile('vless://'+ID+'@vpn.example:443?'+q+'#Location')[1]
+    def test_tcp_flow_reality(self):
+        c=self.vless('type=tcp&security=reality&pbk=abc&sid=0123&sni=mail.example&flow=xtls-rprx-vision')
+        o=c['outbounds'][0]
+        self.assertEqual(o['settings']['vnext'][0]['users'][0]['flow'],'xtls-rprx-vision')
+        self.assertEqual(o['streamSettings']['realitySettings']['shortId'],'0123')
+    def test_grpc_and_xhttp_parameters(self):
+        c=self.vless('type=grpc&security=tls&serviceName=service&mode=multi')
+        self.assertEqual(c['outbounds'][0]['streamSettings']['grpcSettings'],{'serviceName':'service','multiMode':True})
+        c=self.vless('type=xhttp&security=tls&path=%2Fx&extra=%7B%22scMaxEachPostBytes%22%3A1000%7D')
+        self.assertEqual(c['outbounds'][0]['streamSettings']['xhttpSettings']['scMaxEachPostBytes'],1000)
+    def test_unknown_options_are_not_dropped(self):
+        with self.assertRaises(Invalid): self.vless('type=tcp&newOption=secret')
+    def test_base64_subscription_and_native_split(self):
+        raw='vless://'+ID+'@vpn.example:443?security=tls#X\ntuic://user:pass@tuic.example:443#T'
+        a,b=parse_payload(base64.b64encode(raw.encode()).decode(),'SUB1')
+        self.assertEqual(len(a),1);self.assertEqual(len(b),1)
+    def test_full_json_preserves_transport_and_dependencies(self):
+        p={'remarks':'A','inbounds':[{'tag':'old'}],'dns':{'servers':['1.1.1.1']},'outbounds':[{'tag':'proxy','protocol':'vless','settings':{},'streamSettings':{'network':'xdrive','xdriveSettings':{'secrets':['private']},'finalmask':{'tcp':[{'type':'fragment'}]}}},{'tag':'direct','protocol':'freedom'}],'routing':{'rules':[{'inboundTag':['old'],'outboundTag':'proxy'}]}}
+        before=copy.deepcopy(p);c=local_config(p,20000)
+        self.assertEqual(p,before)
+        self.assertEqual(c['outbounds'],p['outbounds']);self.assertEqual(c['dns'],p['dns'])
+        self.assertEqual(c['routing']['rules'][0]['inboundTag'],['jackett-local'])
+        self.assertEqual(c['inbounds'][0]['listen'],'127.0.0.1')
+    def test_native_yaml_keeps_unsupported_parameters(self):
+        a,b=parse_payload('proxies:\n- name: T\n  type: tuic\n  server: example\n  port: 443\n  uuid: test\n  password: private\n','SUB1')
+        self.assertEqual(a,[]);self.assertEqual(b[0]['password'],'private')
+    def test_hysteria2(self):
+        _,p=uri_profile('hy2://secret@vpn.example:443?sni=mail.example#H')
+        self.assertEqual(p['outbounds'][0]['streamSettings']['hysteriaSettings']['auth'],'secret')
+    def test_ss_sip002(self):
+        auth=base64.urlsafe_b64encode(b'aes-128-gcm:secret').decode().rstrip('=')
+        _,p=uri_profile('ss://'+auth+'@vpn.example:443#S')
+        self.assertEqual(p['outbounds'][0]['settings']['servers'][0]['password'],'secret')
+    def test_json_not_native_yaml(self):
+        _,native=parse_payload('{"outbounds":[{"protocol":"masque","settings":{"address":"vpn.example","port":443}}]}','XRAY_JSON1')
+        self.assertEqual(native,[])
+
+if __name__=='__main__': unittest.main()
