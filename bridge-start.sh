@@ -2,6 +2,10 @@
 set -eu
 : "${WORKDIR:=/etc/mihomo}"
 export WORKDIR
+# Force one network mode on every architecture; never let TUN capture Xray sockets.
+export JACKETT_NETWORK_MODE="${JACKETT_NETWORK_MODE:-tun}"
+case "$JACKETT_NETWORK_MODE" in tun|proxy) ;; *) echo 'Invalid network mode'; exit 1;; esac
+export TUN=1 TUN_AUTO_ROUTE=false TUN_AUTO_REDIRECT=false
 mkdir -p "$WORKDIR/user_sh"
 # The adapter consumes SUB/SRV once; the original entrypoint must not duplicate them.
 # The adapter writes one local provider hook per SUB/SRV source after validation.
@@ -28,5 +32,6 @@ done
 # Python exec clears source credentials only in the Mihomo child environment.
 python3 /usr/local/lib/jackett/exec-mihomo.py "$@" &
 child_pid=$!
+python3 /usr/local/lib/jackett/network.py || { echo 'Safe network setup failed'; exit 1; }
 while kill -0 "$bridge_pid" 2>/dev/null && kill -0 "$child_pid" 2>/dev/null; do sleep 1; done
 exit 1

@@ -319,6 +319,7 @@ class Bridge:
             hook.append('add_provider '+key+' http http://127.0.0.1:18890/providers/'+key+' false')
             hook.append('PROVIDERS_BLOCK="${PROVIDERS_BLOCK}    proxy: DIRECT\n"')
         hook.append('PROVIDER_INTERVAL=$saved_interval')
+        hook.append('[ "$JACKETT_NETWORK_MODE" != proxy ] || export TUN_IN_AUTOCONFIG=""')
         hook_path=self.work/'user_sh'/'jackett-all-xray.sh'
         hook_path.parent.mkdir(parents=True,exist_ok=True)
         hook_path.write_text('\n'.join(hook)+'\n')

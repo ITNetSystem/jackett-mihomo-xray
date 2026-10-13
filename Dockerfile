@@ -2,7 +2,7 @@ FROM ghcr.io/xtls/xray-core:26.10.10@sha256:ac00cba4be8f428fc65c8c9a4e4c8fa55e3f
 FROM wiktorbgu/mihomo-mikrotik@sha256:3140540997abafa6bc649ae0cebb42b0e3ffbec9eb1d3cd601edde9d355eb733
 COPY minimize-python.py /tmp/minimize-python.py
 RUN for attempt in 1 2 3 4 5; do \
-      apk add --no-cache python3 py3-yaml && break; \
+      apk add --no-cache python3 py3-yaml iproute2 && break; \
       [ "$attempt" -lt 5 ] || exit 1; sleep 5; \
     done && \
     find /usr/lib/python* -type d -name __pycache__ -prune -exec rm -rf {} + && \
@@ -10,7 +10,8 @@ RUN for attempt in 1 2 3 4 5; do \
     python3 /tmp/minimize-python.py && rm /tmp/minimize-python.py
 COPY --from=xray /usr/local/bin/xray /usr/local/bin/xray
 COPY --from=xray /usr/local/share/xray/ /usr/local/share/xray/
-COPY bridge.py exec-mihomo.py /usr/local/lib/jackett/
+COPY bridge.py exec-mihomo.py network.py /usr/local/lib/jackett/
+COPY --chmod=0755 check-network.sh /usr/local/bin/jackett-check-network
 COPY --chmod=0755 bridge-start.sh /usr/local/bin/jackett-bridge-start
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV XRAY_LOCATION_ASSET=/usr/local/share/xray

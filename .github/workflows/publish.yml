@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [Dockerfile, minimize-python.py, retire-variants.py, bridge.py, bridge-start.sh, exec-mihomo.py, test_bridge.py, .dockerignore, .github/workflows/publish.yml]
+    paths: [Dockerfile, minimize-python.py, retire-variants.py, bridge.py, network.py, test_network.py, check-network.sh, bridge-start.sh, exec-mihomo.py, test_bridge.py, .dockerignore, .github/workflows/publish.yml]
 permissions:
   contents: read
   packages: write
@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Test subscription conversion
-        run: python -m pip install PyYAML && python -m unittest -v test_bridge.py
+        run: python -m pip install PyYAML && python -m unittest -v test_bridge.py test_network.py
       - uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64,arm
@@ -32,6 +32,14 @@ jobs:
       - name: Determine image name
         id: image
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Validate all architectures before publishing
+        run: |
+          for platform in linux/arm/v7 linux/arm64 linux/amd64; do
+            docker buildx build --platform "$platform" --load -t jackett-network-check:local .
+            docker run --rm --platform "$platform" --entrypoint /usr/bin/mihomo jackett-network-check:local -v
+            docker run --rm --platform "$platform" --entrypoint /usr/local/bin/xray jackett-network-check:local version
+            docker run --rm --platform "$platform" --cap-add NET_ADMIN --sysctl net.ipv4.conf.all.rp_filter=0 --sysctl net.ipv4.conf.default.rp_filter=0 --entrypoint sh jackett-network-check:local /usr/local/bin/jackett-check-network
+          done
       - name: Build ARMv7 for validation
         uses: docker/build-push-action@v6
         with:

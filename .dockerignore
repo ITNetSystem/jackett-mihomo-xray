@@ -4,3 +4,6 @@
 !bridge.py
 !exec-mihomo.py
 !bridge-start.sh
+
+!network.py
+!check-network.sh
