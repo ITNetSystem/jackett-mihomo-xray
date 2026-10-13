@@ -1,9 +1,9 @@
-name: Publish experimental Mihomo and Xray image
+name: Publish Jackett Mihomo Xray
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [Dockerfile, start.sh, Dockerfile.mikrotik, mikrotik-start.sh, Dockerfile.bridge, Dockerfile.light, Dockerfile.compact, compact.py, test_compact.py, bridge.py, bridge-start.sh, exec-mihomo.py, test_bridge.py, .dockerignore, .github/workflows/publish.yml]
+    paths: [Dockerfile, minimize-python.py, retire-variants.py, bridge.py, bridge-start.sh, exec-mihomo.py, test_bridge.py, .dockerignore, .github/workflows/publish.yml]
 permissions:
   contents: read
   packages: write
@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: Test subscription conversion
-        run: python -m pip install PyYAML && python -m unittest -v test_bridge.py test_compact.py
+        run: python -m pip install PyYAML && python -m unittest -v test_bridge.py
       - uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
@@ -31,79 +31,24 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Determine image name
         id: image
-        shell: bash
         run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/arm64,linux/amd64
-          push: true
-          provenance: false
-          sbom: false
-          tags: |
-            ${{ steps.image.outputs.name }}:1.19.32-xray26.10.10
-            ${{ steps.image.outputs.name }}:experimental
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.description=Experimental Mihomo 1.19.32 and Xray 26.10.10; configurations mounted separately
-
-      - name: Publish MikroTik ENV-compatible variant
+      - name: Publish full image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.mikrotik
+          file: Dockerfile
           platforms: linux/arm64,linux/amd64
           push: true
           provenance: false
           sbom: false
-          tags: |
-            ${{ steps.image.outputs.name }}:mikrotik-xray26.10.10
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-
-      - name: Publish ENV subscription bridge
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile.bridge
-          platforms: linux/arm64,linux/amd64
-          push: true
-          provenance: false
-          sbom: false
-          tags: |
-            ${{ steps.image.outputs.name }}:mikrotik-all-xray26.10.10-v1
+          tags: ${{ steps.image.outputs.name }}:latest
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-
-      - name: Publish light ENV subscription bridge without bundled Geo databases
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile.light
-          platforms: linux/arm64,linux/amd64
-          push: true
-          provenance: false
-          sbom: false
-          tags: |
-            ${{ steps.image.outputs.name }}:mikrotik-light-xray26.10.10-v1
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.description=Light Mihomo and Xray ENV bridge without bundled Xray GeoIP/GeoSite
-
-      - name: Publish compact Xray controller
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile.compact
-          platforms: linux/arm64,linux/amd64
-          push: true
-          provenance: false
-          sbom: false
-          tags: |
-            ${{ steps.image.outputs.name }}:mikrotik-compact-xray26.10.10-v1
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.description=Compact Xray-only ENV controller with basic Clash API for Zashboard
+            org.opencontainers.image.title=Jackett Mihomo Xray
+            org.opencontainers.image.description=Mihomo 1.19.32 and Xray 26.10.10 with ENV subscriptions and Zashboard
+      - name: Remove retired light and compact package versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: python3 retire-variants.py

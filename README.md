@@ -1,55 +1,42 @@
-# Jackett Xray Compact для MikroTik
+# Jackett Mihomo + Xray для MikroTik
 
-Образ: `ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-compact-xray26.10.10-v1`.
+Образ: **`ghcr.io/itnetsystem/jackett-mihomo-xray:latest`**.
+Имя контейнера: **`jackett-mihomo-xray`**.
 
-Xray 26.10.10, ARM64 и AMD64. Без Mihomo и встроенных Geo-баз, с небольшим контроллером подписок и базовым API для интерфейса Zashboard.
+Полная сборка: Mihomo 1.19.32 + Xray 26.10.10, ARM64 и AMD64. Сохранены GUI Zashboard, SELECTOR, MANUAL, AUTO, FALLBACK, LOADBALANCE, протоколы обоих ядер и базы Xray GeoIP/GeoSite.
 
-**[Пошаговая инструкция Compact](README-COMPACT.md)** — сеть, ENV, установка, RAM-диск для временных загрузок и ограничения.
+**[Пошаговая инструкция](README-BRIDGE.md)** — сеть, ENV, установка, обновление и удаление.
 
-## Размер
+## Настройка через ENV
 
-Чистая файловая система AMD64 около **76 МиБ**, интерфейс скачивается дополнительно (предусмотрите около 8 МиБ). Кэш и временная распаковка требуют дополнительного места. Для hAP ax² проверяйте свободное место, а не только общий объём накопителя 128 МБ.
+SUB1, SUB2, SUB3 и далее — URL подписок. SRV1, SRV2 и далее — отдельные ссылки, включая WireGuard и SOCKS5. Источники показываются отдельными провайдерами; общие группы включают их все. UI_SECRET необязателен. Подробности SUB_USER_AGENT, HWID и форматов — в инструкции.
 
-## ENV и установка
-
-SUB1, SUB2, SUB3 и далее — ссылки подписок. SRV1, SRV2 и далее — отдельные ссылки, включая WireGuard. Каждый источник отображается отдельным провайдером; выбор узла выполняется в SELECTOR.
-
-Имена в инструкции:
-
-| Назначение | Значение |
-|---|---|
-| Контейнер | jackett-xray-compact |
-| Интерфейс | veth4jackett |
-| Мост | Docker Bridge |
-| Список ENV | jackett |
-| Каталог | containers/jackett-compact |
-
-После подготовки свободного интерфейса, IP и ENV по инструкции:
+После подготовки свободного интерфейса и ENV:
 
 ```routeros
-/container/add name=jackett-xray-compact remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-compact-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett-compact dns=1.1.1.1 logging=yes start-on-boot=yes
+/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
 ```
 
-RouterOS создаёт папку при распаковке. Дополнительные mountlists и файлы конфигурации для обычной подписки не нужны. Не используйте интерфейс и IP, занятые работающим контейнером.
+После загрузки:
 
-## Порты и возможности
+```routeros
+/container/start [/container/find where name=jackett-mihomo-xray]
+```
 
-- **1080 — SOCKS5**, включая UDP. Это не смешанный HTTP/SOCKS порт.
-- **1081 — HTTP-прокси**.
-- **9090 — API и Zashboard**. UI_SECRET необязателен.
+RouterOS создаёт папку сам. Отдельные config/tmp, mountlists и xray.json для обычной подписки не нужны. Используйте существующий мост `Docker Bridge`, список ENV `jackett`; не назначайте IP/интерфейс, занятые другим контейнером.
 
-Поддерживаются профили Xray, ручной выбор, обновление подписок и проверка задержки. TCP, gRPC, XHTTP и другие поддерживаемые преобразователем транспорты сохраняются. Формат ссылки и поддержка протокола самим ядром — разные вещи; неизвестные параметры явно отклоняются.
+## Порты
 
-Compact не предоставляет DNS-сервер на порту 53, AUTO, балансировку, TUN, графики трафика и список соединений. Протоколы, которые обслуживает только Mihomo, здесь недоступны. Полные конфигурации с правилами Geo требуют отсутствующих файлов баз.
+- **1080 — общий HTTP/SOCKS прокси**, включая поддерживаемую SOCKS5 UDP-передачу.
+- **9090 — API и GUI**.
+- **53 — DNS Mihomo**, если DNS_ENABLE включён.
 
-**При смене узла открытые соединения прерываются**, поскольку публичный процесс Xray перезапускается. Приложения переподключаются через новый узел; звонок или загрузка могут прерваться. Обновление неизменённого выбранного профиля не вызывает перезапуск.
+GUI: `http://172.31.203.4:9090/ui/#/setup?hostname=172.31.203.4&port=9090&secret=` — замените IP своим, при UI_SECRET заполните Secret. Прозрачная маршрутизация LAN настраивается отдельно на MikroTik.
 
-## Другие отдельные сборки
+## Размер и хранилище
 
-| Вариант | Тег | Назначение |
-|---|---|---|
-| Compact | mikrotik-compact-xray26.10.10-v1 | Xray и базовый API Zashboard, без Mihomo и Geo |
-| Light | mikrotik-light-xray26.10.10-v1 | Mihomo + Xray без встроенных баз Xray Geo; около 138 МиБ |
-| Полный | mikrotik-all-xray26.10.10-v1 | Mihomo + Xray с базами Xray Geo; около 164 МиБ |
+Чистая файловая система AMD64 около **156 МиБ** вместо прежних 164 МиБ. Стандартная библиотека Python упакована в ZIP; Mihomo, Xray и Geo-базы сохранены. GUI скачивается дополнительно, временная распаковка тоже требует места.
 
-[Инструкция полной и light-сборок](README-BRIDGE.md). Их интерфейс, порты и доступные настройки отличаются от compact. Рабочий полный контейнер автоматически не переводится на compact.
+На внутренний накопитель hAP ax² 128 МБ эта сборка не помещается. Храните root-dir на постоянном накопителе; RAM для всего контейнера не используется в инструкции.
+
+Light и compact больше не публикуются. Переход с compact требует проверки ENV и каталогов — [порядок перехода](README-BRIDGE.md#переход-с-прежних-вариантов). Полная версия использует WORKDIR=/etc/mihomo и общий порт 1080.

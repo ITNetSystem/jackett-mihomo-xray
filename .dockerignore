@@ -1,15 +1,6 @@
 *
 !Dockerfile
-!start.sh
-!Dockerfile.mikrotik
-!mikrotik-start.sh
-
-!Dockerfile.bridge
+!minimize-python.py
 !bridge.py
 !exec-mihomo.py
 !bridge-start.sh
-
-!Dockerfile.light
-
-!Dockerfile.compact
-!compact.py

@@ -60,7 +60,8 @@ class ConversionTests(unittest.TestCase):
 
     def test_network_error_diagnostics_do_not_expose_url(self):
         import socket, ssl, urllib.error
-        cases=[(socket.gaierror(-2,'private-url'),'DNS resolution failed'),
+        cases=[(OSError(28,'private-url'),'No space left on filesystem'),
+               (socket.gaierror(-2,'private-url'),'DNS resolution failed'),
                (TimeoutError('private-url'),'connection/read timed out'),
                (ssl.SSLCertVerificationError('private-url'),'TLS certificate verification failed')]
         for reason,expected in cases:

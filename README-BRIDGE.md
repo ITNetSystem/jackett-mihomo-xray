@@ -1,23 +1,9 @@
 # Полная сборка Mihomo + Xray — установка на MikroTik
 
-**Для новой компактной сборки без Mihomo используйте [инструкцию Compact](README-COMPACT.md).** Ниже инструкция именно для полной версии; её тег и возможности отличаются.
-
-Образ: `ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1`.
+Образ: `ghcr.io/itnetsystem/jackett-mihomo-xray:latest`.
 Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 
 Подключения добавляются через ENV. SUB1/SUB2 содержат адреса подписок, SRV1/SRV2 — отдельные ссылки. Источники отображаются отдельными провайдерами SUB1, SUB2, SRV1, SRV2 и обновляются автоматически; общая группа SELECTOR включает их все. Файлы конфигурации для обычной подписки создаются контейнером.
-
-## Отдельный light-образ
-
-`ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-light-xray26.10.10-v1`
-
-Сохраняет Mihomo 1.19.32, Xray 26.10.10, интерфейс и все параметры ENV. В него не включены базы Xray `geoip.dat` и `geosite.dat`. Конфигурации Xray с правилами `geoip:`/`geosite:` требуют этих файлов и без них не пройдут проверку. Это не отключает базы, которые Mihomo может самостоятельно загружать по своим настройкам.
-
-Измеренный размер чистой файловой системы AMD64: полный образ около 164 МиБ, light около 138 МиБ (экономия 26 МиБ). Веб-интерфейс дополнительно скачивает около 8 МиБ; кэш, подписки и временные файлы требуют дополнительного места. Сжатый размер загрузки не равен размеру распаковки.
-
-**Light всё ещё не помещается на внутренний накопитель hAP ax² 128 МБ.** Понадобится больше места или другой вариант с меньшим набором компонентов. Не удаляйте рабочий контейнер ради установки light на устройство с недостаточным свободным местом.
-
-Для новой установки замените `remote-image` в команде создания контейнера на указанный light-образ; ENV, интерфейс и пути остаются такими же. Полный образ публикуется отдельно и продолжает содержать базы Xray Geo.
 
 ## Что означают list, key и value
 
@@ -138,7 +124,7 @@ WireGuard работает через пользовательский сете�
 После подготовки сети и ENV установка выполняется одной командой:
 
 ```routeros
-/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
+/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
 ```
 
 Дождитесь завершения downloading/extracting:
@@ -218,7 +204,7 @@ MTProto — Telegram-прокси, а не VPN для произвольных �
 /container/start [/container/find where interface=veth4jackett]
 ```
 
-Для перехода на другой тег перед repull измените remote-image через `/container/set`. ENV и writable каталог сохраняйте. Не используйте один root-dir для нескольких контейнеров.
+Для перехода на другой тег перед repull измените remote-image через `/container/set`. ENV сохраните; перед repull сохраните нужные конфигурации и HWID: данные внутри root-dir могут быть заменены при переустановке. Не используйте один root-dir для нескольких контейнеров.
 
 ## Удаление контейнера
 
@@ -266,14 +252,14 @@ MTProto — Telegram-прокси, а не VPN для произвольных �
 Поле registry-url задаёт один реестр по умолчанию. Современный RouterOS позволяет указать реестр непосредственно в remote-image, поэтому контейнеры из GHCR и Docker Hub могут работать и загружаться на одном роутере:
 
 ```text
-ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1
+ghcr.io/itnetsystem/jackett-mihomo-xray:latest
 registry-1.docker.io/wiktorbgu/mihomo-mikrotik:latest
 ```
 
 Если используется полное имя с реестром, переключать глобальный registry-url для каждой загрузки не требуется. Короткие имена без реестра используют registry-url. Можно оставить Docker Hub реестром по умолчанию, а Jackett всегда указывать с ghcr.io:
 
 ```routeros
-/container/set [/container/find where interface=veth4jackett] remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1
+/container/set [/container/find where interface=veth4jackett] remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest
 /container/config/set registry-url=https://registry-1.docker.io
 ```
 
@@ -281,4 +267,14 @@ registry-1.docker.io/wiktorbgu/mihomo-mikrotik:latest
 
 ## Размер образа
 
-В образе сохранены ядра Mihomo/Xray и базы GeoIP/GeoSite. Удалены предкомпилированный кеш Python и служебные компоненты ensurepip/idlelib/turtledemo/test; запись нового pycache отключена. Это уменьшает размер без изменения протоколов и географических правил. Размер распакованной файловой системы в проверке AMD64 снизился с 178,5 до 164 МиБ; размер загрузки и значение в RouterOS могут отличаться.
+Сохранены Mihomo 1.19.32, Xray 26.10.10 и базы Xray GeoIP/GeoSite. Стандартная библиотека Python хранится в поддерживаемом Python ZIP-формате; удалён предкомпилированный кеш, запись нового pycache отключена. Измеренный размер чистой файловой системы AMD64 уменьшился примерно со 164 до **156 МиБ**. Интерфейс дополнительно скачивается при запуске. Реестр передаёт сжатые слои, а распаковка требует дополнительного свободного места.
+
+На внутренний накопитель hAP ax² 128 МБ образ не помещается. Хранение всего root-dir в RAM здесь не предлагается: после перезагрузки файлы исчезают. Временную распаковку можно вынести в RAM отдельно, но это не уменьшает размер установленного контейнера.
+
+## Переход с прежних вариантов
+
+Light и compact сняты с публикации. Для полной версии используйте `ghcr.io/itnetsystem/jackett-mihomo-xray:latest` и имя контейнера `jackett-mihomo-xray`.
+
+Compact имел другой WORKDIR и отдельные порты SOCKS/HTTP. Для перехода остановите и удалите только его контейнер, дождитесь завершения удаления, затем создайте полный по инструкции выше, сохранив существующие ENV и свободный интерфейс. Не оставляйте в ENV настройки compact: `WORKDIR=/etc/jackett` и `HTTP_PORT`. У полного WORKDIR по умолчанию `/etc/mihomo`, HTTP/SOCKS используют общий порт 1080.
+
+Не переносите tmpfs `/etc/jackett/ui` или прежний root-dir из RAM. Общая папка containers, мост и ENV других контейнеров не удаляются.

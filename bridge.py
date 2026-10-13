@@ -2,6 +2,7 @@
 """ENV subscription adapter. Remote credentials never enter the Mihomo provider."""
 import base64
 import copy
+import errno
 import hashlib
 import http.server
 import json
@@ -94,7 +95,8 @@ def source_error(error):
     if isinstance(reason, TimeoutError): return 'connection/read timed out; check gateway, NAT, firewall and hairpin'
     if isinstance(reason, ConnectionRefusedError): return 'connection refused'
     if isinstance(reason, ConnectionResetError): return 'connection reset'
-    if isinstance(reason, OSError): return 'network error (errno '+str(reason.errno)+')'
+    if isinstance(reason,OSError) and reason.errno==errno.ENOSPC:return 'No space left on filesystem (errno 28)'
+    if isinstance(reason, OSError): return 'OS error (errno '+str(reason.errno)+')'
     return type(error).__name__
 
 def uri_profile(link):
