@@ -69,14 +69,19 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 
 ## 3. ENV: подписка и веб-панель
 
-Замените значения подписки и пароля своими. SUB1 достаточно для запуска; остальные источники добавляются при необходимости.
+Замените значение подписки своим. SUB1 достаточно для запуска; остальные источники добавляются при необходимости. **UI_SECRET — необязательный параметр.** Если его не задавать или оставить пустым, API и веб-панель работают без пароля.
 
 ```routeros
 /container/envs/add list=jackett key=SUB1 value="ВАША_ССЫЛКА_ПОДПИСКИ"
 /container/envs/add list=jackett key=LOG_LEVEL value=info
-/container/envs/add list=jackett key=UI_SECRET value="ВАШ_ПАРОЛЬ_API"
 /container/envs/add list=jackett key=EXTERNAL_UI_URL value="https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip"
 /container/envs/add list=jackett key=PROVIDER_INTERVAL value=3600
+```
+
+Если нужен пароль API, добавьте отдельно:
+
+```routeros
+/container/envs/add list=jackett key=UI_SECRET value="ВАШ_ПАРОЛЬ_API"
 ```
 
 Необязательные дополнительные источники:
@@ -124,7 +129,7 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 
 ## 5. Веб-панель и подключение
 
-Откройте `http://192.168.240.2:9090/ui/`. Укажите hostname **192.168.240.2**, port **9090**, secret — значение UI_SECRET. Если нужна страница настройки подключения: `http://192.168.240.2:9090/ui/#/setup?hostname=192.168.240.2&port=9090`.
+Откройте `http://192.168.240.2:9090/ui/`. Укажите hostname **192.168.240.2**, port **9090**, secret — значение UI_SECRET; если пароль не задавали, оставьте поле secret пустым. Если нужна страница настройки подключения: `http://192.168.240.2:9090/ui/#/setup?hostname=192.168.240.2&port=9090`.
 
 Провайдер называется **JACKETT_XRAY**. Xray-подключения имеют префикс `[Xray]`; их тип в Mihomo — локальный SOCKS. Исходный протокол обслуживает Xray. Нативные Mihomo-подключения сохраняют свой тип.
 
@@ -141,7 +146,7 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 | HWID | Идентификатор для ограниченных подписок; автоматически сохраняется в каталоге конфигурации |
 | LOG_LEVEL | Уровень журнала Mihomo; Xray пишет warning |
 | EXTERNAL_UI_URL | URL ZIP веб-панели |
-| UI_SECRET | Пароль API |
+| UI_SECRET | Необязательный пароль API; без него или при пустом значении пароль не требуется |
 | MIXED_PORT | Порт HTTP/SOCKS, по умолчанию 1080 |
 | UI_PORT | Порт API/UI, по умолчанию 9090 |
 | WORKDIR | Каталог конфигурации, по умолчанию /etc/mihomo |
