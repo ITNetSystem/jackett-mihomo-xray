@@ -52,14 +52,14 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 /interface/bridge/port/print where interface=veth4jackett
 ```
 
-Для полностью новой сети ниже приведён пример **192.168.240.0/24**: шлюз 192.168.240.1, контейнер 192.168.240.2. Если Docker Bridge уже обслуживает другую сеть, используйте свободный адрес из неё и существующий шлюз; замените адреса в командах NAT/firewall и URL панели. Команды создания выполняйте только для отсутствующих элементов:
+В командах используется сеть **172.31.203.0/24**: шлюз 172.31.203.254, контейнер 172.31.203.4. Если Docker Bridge уже обслуживает другую сеть, используйте свободный адрес из неё и существующий шлюз; замените адреса в командах NAT/firewall и URL панели. Команды создания выполняйте только для отсутствующих элементов:
 
 ```routeros
 /interface/bridge/add name="Docker Bridge"
-/ip/address/add address=192.168.240.1/24 interface="Docker Bridge"
-/interface/veth/add name=veth4jackett address=192.168.240.2/24 gateway=192.168.240.1
+/ip/address/add address=172.31.203.254/24 interface="Docker Bridge"
+/interface/veth/add name=veth4jackett address=172.31.203.4/24 gateway=172.31.203.254
 /interface/bridge/port/add bridge="Docker Bridge" interface=veth4jackett
-/ip/firewall/nat/add chain=srcnat src-address=192.168.240.0/24 out-interface-list=WAN action=masquerade comment="Jackett container Internet"
+/ip/firewall/nat/add chain=srcnat src-address=172.31.203.0/24 out-interface-list=WAN action=masquerade comment="Jackett container Internet"
 ```
 
 В примере WAN — существующий список внешних интерфейсов. Если его нет, в правиле NAT замените `out-interface-list=WAN` на `out-interface=ИМЯ_ВАШЕГО_WAN`. Контейнер должен выходить в интернет обычным маршрутом; не направляйте его собственный трафик обратно через него.
@@ -67,9 +67,9 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 При блокирующих правилах forward разрешите трафик контейнера в WAN, ответный established/related и доступ из доверенной LAN к TCP 1080/9090. Разрешения должны стоять перед блокирующими правилами. Например, если у вас настроены списки LAN и WAN:
 
 ```routeros
-/ip/firewall/filter/add chain=forward action=accept dst-address=192.168.240.2 connection-state=established,related place-before=0 comment="Jackett return traffic"
-/ip/firewall/filter/add chain=forward action=accept src-address=192.168.240.2 out-interface-list=WAN place-before=0 comment="Jackett outbound"
-/ip/firewall/filter/add chain=forward action=accept in-interface-list=LAN dst-address=192.168.240.2 protocol=tcp dst-port=1080,9090 place-before=0 comment="Jackett LAN access"
+/ip/firewall/filter/add chain=forward action=accept dst-address=172.31.203.4 connection-state=established,related place-before=0 comment="Jackett return traffic"
+/ip/firewall/filter/add chain=forward action=accept src-address=172.31.203.4 out-interface-list=WAN place-before=0 comment="Jackett outbound"
+/ip/firewall/filter/add chain=forward action=accept in-interface-list=LAN dst-address=172.31.203.4 protocol=tcp dst-port=1080,9090 place-before=0 comment="Jackett LAN access"
 ```
 
 Эти правила не отменяют блокировку в RAW или внешнем firewall. Публиковать API 9090 в интернет не требуется.
@@ -122,7 +122,7 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 После подготовки сети и ENV установка выполняется одной командой:
 
 ```routeros
-/container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
+/container/add name=jackett-mihomo-xray remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
 ```
 
 Дождитесь завершения downloading/extracting:
@@ -134,13 +134,19 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 
 В команде используется envlists=jackett. Mountlist этой установке не нужен.
 
+Чтобы переименовать уже установленный контейнер, без остановки и переустановки:
+
+```routeros
+/container/set [/container/find where interface=veth4jackett] name=jackett-mihomo-xray
+```
+
 ## 5. Веб-панель и подключение
 
-Откройте `http://192.168.240.2:9090/ui/`. Укажите hostname **192.168.240.2**, port **9090**, secret — значение UI_SECRET; если пароль не задавали, оставьте поле secret пустым. Если нужна страница настройки подключения: `http://192.168.240.2:9090/ui/#/setup?hostname=192.168.240.2&port=9090`.
+Откройте `http://172.31.203.4:9090/ui/`. Укажите hostname **172.31.203.4**, port **9090**, secret — значение UI_SECRET; если пароль не задавали, оставьте поле secret пустым. Если нужна страница настройки подключения: `http://172.31.203.4:9090/ui/#/setup?hostname=172.31.203.4&port=9090`.
 
 Провайдер называется **JACKETT_XRAY**. Xray-подключения имеют префикс `[Xray]`; их тип в Mihomo — локальный SOCKS. Исходный протокол обслуживает Xray. Нативные Mihomo-подключения сохраняют свой тип.
 
-Для выбора подключения: SELECTOR → MANUAL → нужный узел. HTTP/SOCKS-прокси доступен на **192.168.240.2:1080**. Установка контейнера сама по себе не направляет весь трафик LAN через VPN. Прозрачная маршрутизация на RouterOS настраивается отдельно для выбранных устройств.
+Для выбора подключения: SELECTOR → MANUAL → нужный узел. HTTP/SOCKS-прокси доступен на **172.31.203.4:1080**. Установка контейнера сама по себе не направляет весь трафик LAN через VPN. Прозрачная маршрутизация на RouterOS настраивается отдельно для выбранных устройств.
 
 ## ENV
 
