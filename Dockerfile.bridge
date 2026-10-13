@@ -1,6 +1,9 @@
 FROM ghcr.io/xtls/xray-core:26.10.10@sha256:ac00cba4be8f428fc65c8c9a4e4c8fa55e3f6270d8a8d54316100ff3946899ce AS xray
 FROM wiktorbgu/mihomo-mikrotik@sha256:3140540997abafa6bc649ae0cebb42b0e3ffbec9eb1d3cd601edde9d355eb733
-RUN apk add --no-cache python3 py3-yaml
+RUN for attempt in 1 2 3 4 5; do \
+      apk add --no-cache python3 py3-yaml && exit 0; \
+      [ "$attempt" -lt 5 ] || exit 1; sleep 5; \
+    done
 COPY --from=xray /usr/local/bin/xray /usr/local/bin/xray
 COPY --from=xray /usr/local/share/xray/ /usr/local/share/xray/
 COPY bridge.py exec-mihomo.py /usr/local/lib/jackett/
