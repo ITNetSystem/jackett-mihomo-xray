@@ -2,7 +2,7 @@ import base64
 import copy
 import json
 import unittest
-from bridge import Invalid, local_config, parse_payload, uri_profile, source_error
+from bridge import Invalid, local_config, parse_payload, uri_profile, source_error, Bridge
 
 ID='11111111-1111-4111-8111-111111111111'
 class ConversionTests(unittest.TestCase):
@@ -76,6 +76,29 @@ class ConversionTests(unittest.TestCase):
             self.assertEqual(native,[])
         with self.assertRaises(Invalid):
             parse_payload(raw+'\nunknown-proxy://secret@vpn.example:443','SUB1')
+
+    def test_sources_get_separate_providers_and_shared_hook(self):
+        import os,tempfile
+        from unittest.mock import patch,Mock
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as work:
+            link='vless://'+ID+'@vpn.example:443?security=tls#Same-name'
+            with patch.dict(os.environ,{'WORKDIR':work,'SUB1':link,'SUB2':link,'SRV1':'tuic://user:pass@tuic.example:443#Native'},clear=True):
+                b=Bridge()
+                with patch('bridge.subprocess.run',return_value=Mock(returncode=0)),patch('bridge.subprocess.Popen'):
+                    b.refresh()
+                self.assertEqual(set(b.providers),{'SUB1','SUB2','SRV1'})
+                first=json.loads(b.provider_body('SUB1'))['proxies']
+                second=json.loads(b.provider_body('SUB2'))['proxies']
+                self.assertEqual(len(first),1);self.assertEqual(len(second),1)
+                self.assertNotEqual(first[0]['port'],second[0]['port'])
+                self.assertNotEqual(first[0]['name'],second[0]['name'])
+                self.assertTrue(b.provider_body('SRV1').startswith(b'tuic://'))
+                hook=(Path(work)/'user_sh/jackett-all-xray.sh').read_text()
+                for key in ('SUB1','SUB2','SRV1'):
+                    self.assertIn('add_provider '+key+' http',hook)
+                    self.assertIn('/providers/'+key,hook)
+                self.assertNotIn('add_provider JACKETT_XRAY',hook)
 
     def test_json_not_native_yaml(self):
         _,native=parse_payload('{"outbounds":[{"protocol":"masque","settings":{"address":"vpn.example","port":443}}]}','XRAY_JSON1')

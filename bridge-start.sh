@@ -4,15 +4,7 @@ set -eu
 export WORKDIR
 mkdir -p "$WORKDIR/user_sh"
 # The adapter consumes SUB/SRV once; the original entrypoint must not duplicate them.
-cat > "$WORKDIR/user_sh/jackett-all-xray.sh" <<'HOOK'
-saved_interval=$PROVIDER_INTERVAL
-PROVIDER_INTERVAL=60
-[ -n "$PROVIDERS_BLOCK" ] || PROVIDERS_LIST=""
-add_provider JACKETT_XRAY http http://127.0.0.1:18890/proxies false
-PROVIDERS_BLOCK="${PROVIDERS_BLOCK}    proxy: DIRECT
-"
-PROVIDER_INTERVAL=$saved_interval
-HOOK
+# The adapter writes one local provider hook per SUB/SRV source after validation.
 # A reused test volume must not insert stale test proxies.
 export JACKETT_XRAY_TEST=0
 python3 /usr/local/lib/jackett/bridge.py &

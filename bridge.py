@@ -228,7 +228,7 @@ class Bridge:
         os.umask(0o077)
         self.work=Path(os.getenv('WORKDIR','/etc/mihomo'))
         self.state=self.work/'.jackett-xray';self.state.mkdir(parents=True,exist_ok=True)
-        self.running={};self.proxies=[];self.native=[];self.stop=threading.Event()
+        self.running={};self.proxies=[];self.native=[];self.providers={};self.stop=threading.Event()
         self.sources={k:v for k,v in os.environ.items() if re.fullmatch(r'(SUB|SRV|XRAY_JSON)[0-9]+(?:_[A-Za-z0-9]+)?',k) and v}
         if not self.sources: raise Invalid('Add SUB1, SRV1 or XRAY_JSON1')
         self.hwid=os.getenv('HWID','')
@@ -249,7 +249,7 @@ class Bridge:
         return parse_payload(value,key)
 
     def refresh(self):
-        profiles=[];native=[];pending_cache=[]
+        profiles=[];native=[];pending_cache=[];providers={}
         for key,value in sorted(self.sources.items()):
             # Cache indexed by source, without storing the URL in logs or cache names.
             cache=self.state/('source-'+hashlib.sha256((key+value).encode()).hexdigest()[:20]+'.json')
@@ -261,16 +261,18 @@ class Bridge:
                 if not cache.exists(): raise Invalid('Cannot load '+key+' ('+source_error(e)+')') from None
                 print('Keeping last valid source '+key+' ('+source_error(e)+')',flush=True)
                 parsed=json.loads(cache.read_text())
+            source_native=parsed[1]
+            if any(isinstance(x,str) for x in source_native) and any(isinstance(x,dict) for x in source_native):
+                raise Invalid('Do not mix native URI and native YAML within one source: '+key)
+            providers[key]={'proxies':[],'native':source_native}
             for index,(name,config) in enumerate(parsed[0]):
                 identity=key+':'+name+':'+str(index)
-                profiles.append((identity,name,config))
+                profiles.append((key,identity,name,config))
             native.extend(parsed[1])
         if len(profiles)>MAX_PROFILES: raise Invalid('Maximum 64 Xray connections')
         if not profiles and not native: raise AccessRejected('Subscription has no usable connections; refusing direct fallback')
-        if any(isinstance(x,str) for x in native) and any(isinstance(x,dict) for x in native):
-            raise Invalid('Do not mix native URI and native YAML sources; use one native format')
         desired={};proxies=[];names=set()
-        for ident,name,config in profiles:
+        for key,ident,name,config in profiles:
             if ident not in self.mapping:
                 used=set(self.mapping.values());self.mapping[ident]=next((x for x in range(20000,21000) if x not in used),None)
                 if self.mapping[ident] is None: raise Invalid('Local port pool exhausted')
@@ -285,7 +287,9 @@ class Bridge:
             desired[port]=(digest,c,path)
             name='[Xray] '+name
             if name in names: name+=' ('+str(port)+')'
-            names.add(name);proxies.append({'name':name,'type':'socks5','server':'127.0.0.1','port':port,'udp':True})
+            names.add(name)
+            proxy={'name':name,'type':'socks5','server':'127.0.0.1','port':port,'udp':True}
+            proxies.append(proxy);providers[key]['proxies'].append(proxy)
         # Validation completes before changing any running connection.
         for cache,parsed in pending_cache: atomic(cache,parsed)
         for port,(proc,digest) in list(self.running.items()):
@@ -299,7 +303,16 @@ class Bridge:
                 atomic(path,c)
                 proc=subprocess.Popen(['/usr/local/bin/xray','run','-config',str(path)])
                 self.running[port]=(proc,digest)
-        self.proxies=proxies;self.native=native
+        self.proxies=proxies;self.native=native;self.providers=providers
+        hook=['saved_interval=$PROVIDER_INTERVAL','PROVIDER_INTERVAL=60',
+              '[ -n "$PROVIDERS_BLOCK" ] || PROVIDERS_LIST=""']
+        for key in sorted(providers):
+            hook.append('add_provider '+key+' http http://127.0.0.1:18890/providers/'+key+' false')
+            hook.append('PROVIDERS_BLOCK="${PROVIDERS_BLOCK}    proxy: DIRECT\n"')
+        hook.append('PROVIDER_INTERVAL=$saved_interval')
+        hook_path=self.work/'user_sh'/'jackett-all-xray.sh'
+        hook_path.parent.mkdir(parents=True,exist_ok=True)
+        hook_path.write_text('\n'.join(hook)+'\n')
         atomic(self.state/'ports.json',self.mapping)
         atomic(self.work/'jackett-native.json',{'proxies':[x for x in native if isinstance(x,dict)]})
         (self.work/'jackett-native-links.txt').write_text('\n'.join(x for x in native if isinstance(x,str)))
@@ -312,21 +325,33 @@ class Bridge:
             try: proc.wait(timeout=5)
             except subprocess.TimeoutExpired: proc.kill();proc.wait()
 
+    def provider_body(self,key):
+        provider=self.providers[key]
+        proxies=provider['proxies'];native=provider['native']
+        links=[x for x in native if isinstance(x,str)]
+        if links:
+            local=['socks5://127.0.0.1:'+str(x['port'])+'#'+url.quote(x['name']) for x in proxies]
+            return ('\n'.join(local+links)).encode()
+        return json.dumps({'proxies':proxies+[x for x in native if isinstance(x,dict)]},ensure_ascii=False).encode()
+
     def run(self):
         self.refresh()
         bridge=self
         class Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
-                if self.path not in ('/proxies','/ready','/native-json','/native-links'): self.send_error(404);return
-                body=json.dumps({'proxies':bridge.proxies+[x for x in bridge.native if isinstance(x,dict)]},ensure_ascii=False).encode()
-                native_links=[x for x in bridge.native if isinstance(x,str)]
-                if self.path=='/proxies' and native_links:
-                    local=['socks5://127.0.0.1:'+str(x['port'])+'#'+url.quote(x['name']) for x in bridge.proxies]
-                    body=('\n'.join(local+native_links)).encode()
-                if self.path=='/native-json': body=json.dumps({'proxies':[x for x in bridge.native if isinstance(x,dict)]}).encode()
-                if self.path=='/native-links':
-                    links=[x for x in bridge.native if isinstance(x,str)]
-                    body=('\n'.join(links)).encode() if links else b'{"proxies":[]}'
+                if self.path=='/ready':
+                    body=b'{"ready":true}'
+                elif self.path.startswith('/providers/') and self.path[11:] in bridge.providers:
+                    body=bridge.provider_body(self.path[11:])
+                elif self.path=='/proxies':
+                    # Compatibility view; runtime hooks use separate source endpoints.
+                    body=json.dumps({'proxies':bridge.proxies+[x for x in bridge.native if isinstance(x,dict)]},ensure_ascii=False).encode()
+                    if any(isinstance(x,str) for x in bridge.native):
+                        if any(isinstance(x,dict) for x in bridge.native): self.send_error(409);return
+                        local=['socks5://127.0.0.1:'+str(x['port'])+'#'+url.quote(x['name']) for x in bridge.proxies]
+                        body=('\n'.join(local+[x for x in bridge.native if isinstance(x,str)])).encode()
+                else:
+                    self.send_error(404);return
                 self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
             def log_message(self,*args): pass
         server=http.server.ThreadingHTTPServer(('127.0.0.1',18890),Handler)
