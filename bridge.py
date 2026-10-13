@@ -85,6 +85,7 @@ def stream(q, host):
 
 def source_error(error):
     """Explain network failures without logging URLs or credential-bearing text."""
+    if isinstance(error, Invalid): return str(error)
     if isinstance(error, urllib.error.HTTPError): return 'HTTP '+str(error.code)
     reason = error.reason if isinstance(error, urllib.error.URLError) else error
     if isinstance(reason, ssl.SSLCertVerificationError): return 'TLS certificate verification failed'
@@ -199,7 +200,7 @@ def parse_payload(text, source):
     result=[]; native=[]
     for line in text.splitlines():
         line=line.strip()
-        if not line or line.startswith('#') or line.startswith('happ://'): continue
+        if not line or line.startswith('#') or line.startswith(('happ://','incy://routing/')): continue
         profile=uri_profile(line)
         if profile is None: native.append(line)
         else: result.append(profile)

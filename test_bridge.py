@@ -68,6 +68,15 @@ class ConversionTests(unittest.TestCase):
             self.assertIn(expected,message)
             self.assertNotIn('private-url',message)
 
+    def test_subscription_ignores_client_routing_deeplinks(self):
+        raw='vless://'+ID+'@vpn.example:443?type=tcp&security=tls#X\nincy://routing/onadd/eyJOYW1lIjoiRXhhbXBsZSJ9\nhapp://routing/onadd/eyJOYW1lIjoiRXhhbXBsZSJ9'
+        for text in (raw,base64.b64encode(raw.encode()).decode()):
+            profiles,native=parse_payload(text,'SUB1')
+            self.assertEqual(len(profiles),1)
+            self.assertEqual(native,[])
+        with self.assertRaises(Invalid):
+            parse_payload(raw+'\nunknown-proxy://secret@vpn.example:443','SUB1')
+
     def test_json_not_native_yaml(self):
         _,native=parse_payload('{"outbounds":[{"protocol":"masque","settings":{"address":"vpn.example","port":443}}]}','XRAY_JSON1')
         self.assertEqual(native,[])
