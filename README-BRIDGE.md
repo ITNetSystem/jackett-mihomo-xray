@@ -33,25 +33,35 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 /system/device-mode/update container=yes
 ```
 
-Подтвердите изменение физически способом, указанным RouterOS. Подготовьте доступное хранилище: ниже пример для диска **disk1**. Если он называется иначе, замените `disk1` во всех путях. Каталоги должны быть новыми; не используйте папки другого контейнера.
+Подтвердите изменение физически способом, указанным RouterOS. Все файлы этого контейнера находятся в **/containers/jackett**. Общая папка **/containers** может содержать другие контейнеры. В RouterOS root-dir и /file указываются без начального слеша, а src mount — с ним. Каталог root создаётся при распаковке образа; вручную его не создавайте.
 
 ```routeros
-/file/add name=disk1/jackett type=directory
-/file/add name=disk1/jackett/config type=directory
-/file/add name=disk1/jackett/tmp type=directory
-/container/config/set registry-url=https://ghcr.io tmpdir=disk1/jackett/tmp
-/container/mounts/add list=jackett src=/disk1/jackett/config dst=/etc/mihomo mode=rw
+:if ([:len [/file/find where name="containers"]] = 0) do={ /file/add name=containers type=directory }
+:if ([:len [/file/find where name="containers/jackett"]] = 0) do={ /file/add name=containers/jackett type=directory }
+:if ([:len [/file/find where name="containers/jackett/config"]] = 0) do={ /file/add name=containers/jackett/config type=directory }
+:if ([:len [/file/find where name="containers/jackett/tmp"]] = 0) do={ /file/add name=containers/jackett/tmp type=directory }
+/container/config/set registry-url=https://ghcr.io tmpdir=containers/jackett/tmp
+:if ([:len [/container/mounts/find where list=jackett and dst="/etc/mihomo"]] = 0) do={ /container/mounts/add list=jackett src=/containers/jackett/config dst=/etc/mihomo mode=rw }
 ```
 
 ## 2. Сеть контейнера
 
-Пример использует отдельную сеть **192.168.240.0/24**. Убедитесь, что она свободна; при необходимости замените её во всех командах. Адрес роутера/шлюза 192.168.240.1, контейнера 192.168.240.2.
+Используется мост **Docker Bridge** и интерфейс **veth4jackett**. Если они уже созданы, не создавайте повторно и сохраните их действующие IP/шлюз. Посмотрите текущую сеть:
 
 ```routeros
-/interface/bridge/add name=bridge-jackett
-/ip/address/add address=192.168.240.1/24 interface=bridge-jackett
-/interface/veth/add name=veth-jackett address=192.168.240.2/24 gateway=192.168.240.1
-/interface/bridge/port/add bridge=bridge-jackett interface=veth-jackett
+/interface/bridge/print where name="Docker Bridge"
+/ip/address/print where interface="Docker Bridge"
+/interface/veth/print detail where name=veth4jackett
+/interface/bridge/port/print where interface=veth4jackett
+```
+
+Для полностью новой сети ниже приведён пример **192.168.240.0/24**: шлюз 192.168.240.1, контейнер 192.168.240.2. Если Docker Bridge уже обслуживает другую сеть, используйте свободный адрес из неё и существующий шлюз; замените адреса в командах NAT/firewall и URL панели. Команды создания выполняйте только для отсутствующих элементов:
+
+```routeros
+/interface/bridge/add name="Docker Bridge"
+/ip/address/add address=192.168.240.1/24 interface="Docker Bridge"
+/interface/veth/add name=veth4jackett address=192.168.240.2/24 gateway=192.168.240.1
+/interface/bridge/port/add bridge="Docker Bridge" interface=veth4jackett
 /ip/firewall/nat/add chain=srcnat src-address=192.168.240.0/24 out-interface-list=WAN action=masquerade comment="Jackett container Internet"
 ```
 
@@ -115,14 +125,14 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 После подготовки сети, mounts и ENV установка выполняется одной командой:
 
 ```routeros
-/container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth-jackett root-dir=disk1/jackett/root mountlists=jackett dns=1.1.1.1 logging=yes start-on-boot=yes
+/container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett/root mountlists=jackett dns=1.1.1.1 logging=yes start-on-boot=yes
 ```
 
 Дождитесь завершения downloading/extracting:
 
 ```routeros
 /container/print detail
-/container/start [/container/find where interface=veth-jackett]
+/container/start [/container/find where interface=veth4jackett]
 ```
 
 В современных RouterOS используются `envlists` и `mountlists`. Старые версии могут иметь другой синтаксис; инструкция рассчитана на версию с этими параметрами.
@@ -179,17 +189,58 @@ MTProto — Telegram-прокси, а не VPN для произвольных �
 ## Обновление образа
 
 ```routeros
-/container/stop [/container/find where interface=veth-jackett]
-/container/repull [/container/find where interface=veth-jackett]
+/container/stop [/container/find where interface=veth4jackett]
+/container/repull [/container/find where interface=veth4jackett]
 ```
 
 Дождитесь загрузки/распаковки, затем:
 
 ```routeros
-/container/start [/container/find where interface=veth-jackett]
+/container/start [/container/find where interface=veth4jackett]
 ```
 
 Для перехода на другой тег перед repull измените remote-image через `/container/set`. ENV и writable каталог сохраняйте. Не используйте один root-dir для нескольких контейнеров.
+
+## Удаление контейнера вместе с папками
+
+Удаление через меню container само по себе не является командой очистки всех mounted-данных. Для удаления контейнера **и /containers/jackett** используйте отдельный скрипт ниже. Он удаляет конфигурацию, кеш и HWID вместе с файлами образа. ENV jackett, интерфейс veth4jackett и общий Docker Bridge сохраняются для повторной установки. Общая папка /containers не удаляется.
+
+Добавьте скрипт один раз:
+
+```routeros
+/system/script/add name=jackett-remove policy=read,write,test source={
+    :local cid [/container/find where interface=veth4jackett]
+    :if ([:len $cid] > 1) do={ :error "More than one container on veth4jackett" }
+    :if ([:len $cid] = 1) do={
+        :if ([/container/get $cid root-dir] != "containers/jackett/root") do={ :error "Unexpected root-dir; cleanup stopped" }
+        /container/set $cid start-on-boot=no
+        /container/stop $cid
+        :local tries 0
+        :while (([/container/get $cid status] != "stopped") && ($tries < 60)) do={ :delay 1s; :set tries ($tries + 1) }
+        :if ([/container/get $cid status] != "stopped") do={ :error "Container did not stop; files kept" }
+        /container/remove $cid
+        :set tries 0
+        :while (([:len [/container/find where interface=veth4jackett]] > 0) && ($tries < 60)) do={ :delay 1s; :set tries ($tries + 1) }
+    }
+    :if ([:len [/container/find where interface=veth4jackett]] > 0) do={ :error "Container is still deleting; files kept" }
+    :foreach other in=[/container/find] do={
+        :local otherRoot [/container/get $other root-dir]
+        :if ($otherRoot ~ "^/?containers/jackett(/|$)") do={ :error "Another container uses this folder; files kept" }
+    }
+    /file/remove [/file/find where name="containers/jackett"]
+    :put "Jackett container and its folder removed"
+}
+```
+
+Затем полное удаление выполняется одной командой:
+
+```routeros
+/system/script/run jackett-remove
+```
+
+Если контейнер уже удалён вручную, тот же скрипт очистит оставшуюся папку. Если RouterOS сообщает, что файлы ещё заняты, дождитесь завершения удаления и повторите запуск. Команды скрипта нужно проверить на своей версии RouterOS; здесь они не выполнялись на роутере. Скрипт не вызывается автоматически при нажатии Remove в WinBox: для общей очистки запускайте jackett-remove.
+
+Для переустановки заново выполните создание папок из шага 1 и команду container/add; существующие ENV и mountlist повторно не добавляйте. Удаление HWID создаст новый идентификатор при следующем запуске.
 
 ## Надёжность
 

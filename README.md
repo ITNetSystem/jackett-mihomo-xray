@@ -14,15 +14,15 @@
 
 | Имя | Назначение |
 |---|---|
-| veth-jackett | Интерфейс контейнера |
-| bridge-jackett | Мост сети контейнера |
+| veth4jackett | Интерфейс контейнера |
+| Docker Bridge | Мост сети контейнера |
 | jackett | Список ENV и список mounts |
-| disk1/jackett | Каталог на диске; замените disk1 на имя своего хранилища |
+| /containers/jackett | Каталог контейнера в корневой папке /containers |
 
 После подготовки по инструкции контейнер добавляется одной командой:
 
 ```routeros
-/container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth-jackett root-dir=disk1/jackett/root mountlists=jackett dns=1.1.1.1 logging=yes start-on-boot=yes
+/container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett/root mountlists=jackett dns=1.1.1.1 logging=yes start-on-boot=yes
 ```
 
 В ENV-команде `list=jackett` означает набор переменных, `key=SUB1` — имя переменной, `value` — её значение. ENV можно также добавлять в графическом интерфейсе RouterOS.
@@ -39,3 +39,7 @@ Xray обслуживает VLESS, VMess, Trojan, Shadowsocks, SOCKS/HTTP и д�
 - **9090** — API и веб-панель; необязательный пароль задаётся UI_SECRET. Без него поле secret в веб-панели оставьте пустым.
 
 Для обычной подписки дополнительные файлы конфигурации загружать не требуется. Настройка прозрачной маршрутизации LAN выполняется отдельно на RouterOS.
+
+## Полное удаление
+
+[Скрипт jackett-remove](README-BRIDGE.md#удаление-контейнера-вместе-с-папками) удаляет контейнер и его папку /containers/jackett. Общий Docker Bridge, veth4jackett, ENV jackett и другие контейнеры сохраняются.
