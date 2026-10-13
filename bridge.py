@@ -82,6 +82,11 @@ def stream(q, host):
     return s
 
 def uri_profile(link):
+    # WireGuard keys are base64, not form data. Accept raw / + = in
+    # userinfo and query, and percent-decode exactly once.
+    wg = re.match(r'^(wireguard|wg)://([^@]+)@', link)
+    if wg:
+        link = wg.group(1)+'://'+url.quote(url.unquote(wg.group(2)),safe='')+'@'+link[wg.end():]
     u = url.urlsplit(link)
     if u.scheme in NATIVE: return None
     if u.scheme == 'vmess':
@@ -96,7 +101,8 @@ def uri_profile(link):
         if q['type']=='grpc': q['serviceName']=v.get('path','')
         out = {'protocol':'vmess','settings':{'vnext':[{'address':v['add'],'port':int(v['port']),'users':[{'id':v['id'],'alterId':int(v.get('aid',0)),'security':v.get('scy','auto')}]}]},'streamSettings':stream(q,v['add'])}
         return v.get('ps','VMess'), {'outbounds':[out]}
-    q = dict(url.parse_qsl(u.query,keep_blank_values=True))
+    query = u.query.replace('+','%2B') if u.scheme in ('wireguard','wg') else u.query
+    q = dict(url.parse_qsl(query,keep_blank_values=True))
     name = url.unquote(u.fragment) or u.scheme.upper()
     if u.scheme == 'ss':
         if q: raise Invalid('Shadowsocks plugins require a native configuration')

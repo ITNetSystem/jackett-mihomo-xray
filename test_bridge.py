@@ -41,6 +41,23 @@ class ConversionTests(unittest.TestCase):
         auth=base64.urlsafe_b64encode(b'aes-128-gcm:secret').decode().rstrip('=')
         _,p=uri_profile('ss://'+auth+'@vpn.example:443#S')
         self.assertEqual(p['outbounds'][0]['settings']['servers'][0]['password'],'secret')
+    def test_wireguard_raw_and_encoded_keys(self):
+        from urllib.parse import quote
+        private=base64.b64encode(bytes([251])*32).decode()
+        public=base64.b64encode(bytes([255])*32).decode()
+        psk=base64.b64encode(bytes([250])*32).decode()
+        for scheme in ('wireguard','wg'):
+            for encode in (lambda x:x, lambda x:quote(x,safe='')):
+                link=scheme+'://'+encode(private)+'@[2001:db8::1]:51820?address=10.7.0.2/32&publickey='+encode(public)+'&psk='+encode(psk)+'&allowedips=0.0.0.0/0&keepalive=25#WG'
+                with self.subTest(scheme=scheme,encoded=encode(private)!=private):
+                    _,c=uri_profile(link);w=c['outbounds'][0]['settings']
+                    self.assertEqual(w['secretKey'],private)
+                    self.assertEqual(w['peers'][0]['publicKey'],public)
+                    self.assertEqual(w['peers'][0]['preSharedKey'],psk)
+                    self.assertEqual(w['peers'][0]['endpoint'],'[2001:db8::1]:51820')
+                    profiles,_=parse_payload(base64.b64encode(link.encode()).decode(),'SUB1')
+                    self.assertEqual(profiles[0][1]['outbounds'][0]['settings'],w)
+
     def test_json_not_native_yaml(self):
         _,native=parse_payload('{"outbounds":[{"protocol":"masque","settings":{"address":"vpn.example","port":443}}]}','XRAY_JSON1')
         self.assertEqual(native,[])
