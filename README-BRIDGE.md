@@ -33,16 +33,13 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 /system/device-mode/update container=yes
 ```
 
-Подтвердите изменение физически способом, указанным RouterOS. Все файлы этого контейнера находятся в **/containers/jackett**. Общая папка **/containers** может содержать другие контейнеры. В RouterOS root-dir и /file указываются без начального слеша, а src mount — с ним. Каталог root создаётся при распаковке образа; вручную его не создавайте.
+Подтвердите изменение физически способом, указанным RouterOS. Файлы образа, конфигурация, кеш и HWID хранятся внутри одного root-dir — **containers/jackett**. RouterOS создаёт каталог при распаковке образа. Команды /file/add и отдельный mount не нужны. При новой установке этот путь должен быть свободен.
 
 ```routeros
-:if ([:len [/file/find where name="containers"]] = 0) do={ /file/add name=containers type=directory }
-:if ([:len [/file/find where name="containers/jackett"]] = 0) do={ /file/add name=containers/jackett type=directory }
-:if ([:len [/file/find where name="containers/jackett/config"]] = 0) do={ /file/add name=containers/jackett/config type=directory }
-:if ([:len [/file/find where name="containers/jackett/tmp"]] = 0) do={ /file/add name=containers/jackett/tmp type=directory }
-/container/config/set registry-url=https://ghcr.io tmpdir=containers/jackett/tmp
-:if ([:len [/container/mounts/find where list=jackett and dst="/etc/mihomo"]] = 0) do={ /container/mounts/add list=jackett src=/containers/jackett/config dst=/etc/mihomo mode=rw }
+/container/config/set registry-url=https://ghcr.io tmpdir=""
 ```
+
+Пустой tmpdir возвращает автоматический выбор каталога распаковки. Это общая настройка загрузки контейнеров; другие запущенные контейнеры не меняются.
 
 ## 2. Сеть контейнера
 
@@ -122,10 +119,10 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 
 ## 4. Загрузка и запуск
 
-После подготовки сети, mounts и ENV установка выполняется одной командой:
+После подготовки сети и ENV установка выполняется одной командой:
 
 ```routeros
-/container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett/root mountlists=jackett dns=1.1.1.1 logging=yes start-on-boot=yes
+/container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
 ```
 
 Дождитесь завершения downloading/extracting:
@@ -135,7 +132,7 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 /container/start [/container/find where interface=veth4jackett]
 ```
 
-В современных RouterOS используются `envlists` и `mountlists`. Старые версии могут иметь другой синтаксис; инструкция рассчитана на версию с этими параметрами.
+В команде используется envlists=jackett. Mountlist этой установке не нужен.
 
 ## 5. Веб-панель и подключение
 
@@ -162,7 +159,7 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 | WORKDIR | Каталог конфигурации, по умолчанию /etc/mihomo |
 | CONFIG, TUN, IPTABLES, DNS_*, HEALTH_CHECK_* | Настройки исходных шаблонов wiktorbgu |
 
-Максимум 64 Xray-подключения; каждое работает отдельным процессом Xray. Потребление памяти зависит от количества подключений. Сохраняйте writable каталог /etc/mihomo: в нём HWID, кеш и конфигурации с приватными данными.
+Максимум 64 Xray-подключения; каждое работает отдельным процессом Xray. Потребление памяти зависит от количества подключений. Каталог /etc/mihomo находится внутри root-dir контейнера: в нём HWID, кеш и конфигурации с приватными данными. При удалении контейнера эти данные удаляются вместе с ним.
 
 ## Протоколы и форматы
 
@@ -216,13 +213,19 @@ MTProto — Telegram-прокси, а не VPN для произвольных �
 /container/remove [/container/find where interface=veth4jackett]
 ```
 
-Дождитесь завершения удаления. Каталог файлов контейнера, указанный в root-dir — **/containers/jackett/root** — удаляется RouterOS при штатном удалении контейнера.
+Дождитесь завершения удаления: RouterOS удаляет root-dir **containers/jackett** вместе с внутренними конфигурациями, кешем и HWID. Отдельный скрипт очистки не нужен. Общая /containers, Docker Bridge, veth4jackett и ENV jackett сохраняются.
 
-**/containers/jackett/config — отдельная папка mount**, в которой сохраняются настройки, HWID и кеш подписки. Она вынесена за root-dir для сохранения данных при переустановке. Родительская /containers/jackett может остаться из-за config/tmp; это не оставшиеся файлы образа.
+При переустановке используйте существующие ENV и выполните container/add. HWID будет создан заново; для подписок с привязкой устройства можно заранее задать прежний HWID через ENV.
 
-Если нужно стереть также все сохранённые данные Jackett, после завершения удаления контейнера удалите **/containers/jackett** в Files. Общую /containers не удаляйте: там могут находиться другие контейнеры. При следующей установке HWID будет создан заново.
+### Переход со старой инструкции с config/root/tmp
 
-Общий Docker Bridge, интерфейс veth4jackett, ENV jackett и mountlist сохраняются. Для переустановки используйте прежние ENV и mountlist, подготовьте папки по шагу 1 и выполните container/add.
+Если контейнер был создан с root-dir=containers/jackett/root и mountlist=jackett, это прежняя схема. Остановите и удалите только этот контейнер, дождитесь завершения удаления. Затем удалите старую папку **containers/jackett** в Files и старую запись mountlist:
+
+```routeros
+/container/mounts/remove [/container/mounts/find where list=jackett and dst="/etc/mihomo"]
+```
+
+Это очищает старую конфигурацию и HWID; ENV jackett остаются. После этого выполните container/config и новую команду container/add выше. Не удаляйте общую папку containers или mounts других контейнеров.
 
 ## Надёжность
 

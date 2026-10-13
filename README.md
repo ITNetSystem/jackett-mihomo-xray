@@ -16,14 +16,16 @@
 |---|---|
 | veth4jackett | Интерфейс контейнера |
 | Docker Bridge | Мост сети контейнера |
-| jackett | Список ENV и список mounts |
+| jackett | Список ENV |
 | /containers/jackett | Каталог контейнера в корневой папке /containers |
 
 После подготовки по инструкции контейнер добавляется одной командой:
 
 ```routeros
-/container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett/root mountlists=jackett dns=1.1.1.1 logging=yes start-on-boot=yes
+/container/add remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
 ```
+
+Папка создаётся RouterOS при распаковке образа. Создание config/tmp и mountlist не требуется.
 
 В ENV-команде `list=jackett` означает набор переменных, `key=SUB1` — имя переменной, `value` — её значение. ENV можно также добавлять в графическом интерфейсе RouterOS.
 
@@ -42,4 +44,4 @@ Xray обслуживает VLESS, VMess, Trojan, Shadowsocks, SOCKS/HTTP и д�
 
 ## Удаление
 
-Остановите контейнер и удалите через Remove в WinBox — отдельный скрипт не нужен. Root-dir удаляется при штатном удалении. Отдельная папка mount с конфигурацией сохраняется для переустановки; [подробнее об удалении](README-BRIDGE.md#удаление-контейнера).
+Остановите контейнер и удалите через Remove в WinBox — отдельный скрипт не нужен. Root-dir удаляется при штатном удалении. Все данные находятся внутри одного root-dir containers/jackett и удаляются вместе с контейнером; [подробнее об удалении](README-BRIDGE.md#удаление-контейнера).
