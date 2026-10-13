@@ -100,6 +100,33 @@ class ConversionTests(unittest.TestCase):
                     self.assertIn('/providers/'+key,hook)
                 self.assertNotIn('add_provider JACKETT_XRAY',hook)
 
+    def test_wireguard_uses_tunnel_dns_and_userspace_stack(self):
+        key=base64.b64encode(bytes([251])*32).decode()
+        _,p=uri_profile('wireguard://'+key+'@vpn.example:51820?address=10.7.0.2/32&publickey='+key+'&dns=77.88.8.8,1.1.1.1#WG')
+        w=p['outbounds'][0]
+        self.assertEqual(w['settings']['remoteDNS'],['77.88.8.8','1.1.1.1'])
+        self.assertTrue(w['settings']['noKernelTun'])
+        self.assertEqual(w['tag'],'proxy')
+        self.assertNotIn('dns',p)
+        self.assertTrue(local_config({'outbounds':[{'protocol':'wireguard','settings':{}}]},20000)['outbounds'][0]['settings']['noKernelTun'])
+        self.assertFalse(local_config({'outbounds':[{'protocol':'wireguard','settings':{'noKernelTun':False}}]},20000)['outbounds'][0]['settings']['noKernelTun'])
+
+    def test_unavailable_source_does_not_stop_other_sources(self):
+        import os,tempfile,urllib.error
+        from unittest.mock import patch,Mock
+        with tempfile.TemporaryDirectory() as work:
+            link='tuic://user:pass@tuic.example:443#Native'
+            with patch.dict(os.environ,{'WORKDIR':work,'SRV1':link,'SUB3':'https://private.example/sub'},clear=True):
+                b=Bridge();original=b.fetch
+                def fetch(key,value):
+                    if key=='SUB3': raise urllib.error.HTTPError(value,403,'Forbidden',{},None)
+                    return original(key,value)
+                with patch.object(b,'fetch',side_effect=fetch): b.refresh()
+                self.assertEqual(json.loads(b.provider_body('SUB3')),{'proxies':[]})
+                self.assertTrue(b.provider_body('SRV1').startswith(b'tuic://'))
+                b.sources={'SUB3':'https://private.example/sub'}
+                with patch.object(b,'fetch',side_effect=fetch),self.assertRaises(Invalid): b.refresh()
+
     def test_json_not_native_yaml(self):
         _,native=parse_payload('{"outbounds":[{"protocol":"masque","settings":{"address":"vpn.example","port":443}}]}','XRAY_JSON1')
         self.assertEqual(native,[])

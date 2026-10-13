@@ -164,11 +164,11 @@ def uri_profile(link):
             peer={'publicKey':q.get('publickey',q.get('publicKey',q.get('public_key',''))),'endpoint':host+':'+str(u.port),'allowedIPs':q.get('allowedips',q.get('allowed_ips','0.0.0.0/0,::/0')).split(',')}
             if q.get('presharedkey',q.get('psk')): peer['preSharedKey']=q.get('presharedkey',q.get('psk'))
             if q.get('keepalive'): peer['keepAlive']=int(q['keepalive'])
-            settings={'secretKey':credential,'address':addresses,'peers':[peer]}
+            settings={'secretKey':credential,'address':addresses,'peers':[peer],'noKernelTun':True}
             if q.get('mtu'): settings['mtu']=int(q['mtu'])
             if q.get('reserved'): settings['reserved']=[int(x) for x in q['reserved'].split(',')]
             out={'protocol':'wireguard','settings':settings}
-            if q.get('dns'): return name, {'dns':{'servers':q['dns'].split(',')},'outbounds':[out]}
+            if q.get('dns'): settings['remoteDNS']=q['dns'].split(',')
         else:
             raise Invalid('Use Xray JSON or supported Mihomo YAML for this protocol')
     out['tag']='proxy'
@@ -215,6 +215,9 @@ def local_config(profile,port):
         if isinstance(tags,list) and old_tags.intersection(tags): rule['inboundTag']=['jackett-local']
     # Remove external management listeners; preserve native protocol/transport fields.
     for key in ('api','metrics','reverse','remarks','remark','name'): c.pop(key,None)
+    for outbound in c.get('outbounds',[]):
+        if outbound.get('protocol')=='wireguard':
+            outbound.setdefault('settings',{}).setdefault('noKernelTun',True)
     c['log']={'loglevel':'warning'}
     return c
 
@@ -257,8 +260,12 @@ class Bridge:
                 parsed=self.fetch(key,value)
                 pending_cache.append((cache,parsed))
             except Exception as e:
-                if isinstance(e,urllib.error.HTTPError) and e.code in (401,403,404): raise AccessRejected('Subscription access rejected: '+key) from None
-                if not cache.exists(): raise Invalid('Cannot load '+key+' ('+source_error(e)+')') from None
+                rejected=isinstance(e,urllib.error.HTTPError) and e.code in (401,403,404)
+                if rejected or not cache.exists():
+                    if rejected: cache.unlink(missing_ok=True)
+                    print('Cannot load '+key+' ('+source_error(e)+'); source disabled',flush=True)
+                    providers[key]={'proxies':[],'native':[]}
+                    continue
                 print('Keeping last valid source '+key+' ('+source_error(e)+')',flush=True)
                 parsed=json.loads(cache.read_text())
             source_native=parsed[1]
