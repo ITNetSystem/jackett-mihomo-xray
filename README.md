@@ -23,7 +23,7 @@
 После подготовки по инструкции контейнер добавляется одной командой:
 
 ```routeros
-/container/add name=jackett-mihomo-xray remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
+/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
 ```
 
 Папка создаётся RouterOS при распаковке образа. Создание config/tmp и mountlist не требуется.

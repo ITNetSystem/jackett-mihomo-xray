@@ -122,7 +122,7 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
 После подготовки сети и ENV установка выполняется одной командой:
 
 ```routeros
-/container/add name=jackett-mihomo-xray remote-image=itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
+/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1 envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
 ```
 
 Дождитесь завершения downloading/extracting:
@@ -244,3 +244,21 @@ MTProto — Telegram-прокси, а не VPN для произвольных �
 - [Container](https://manual.mikrotik.com/docs/containers/)
 - [VETH](https://manual.mikrotik.com/docs/containers/veth/)
 - [Параметры container](https://manual.mikrotik.com/docs/cli-reference/container/)
+
+## GHCR и Docker Hub одновременно
+
+Поле registry-url задаёт один реестр по умолчанию. Современный RouterOS позволяет указать реестр непосредственно в remote-image, поэтому контейнеры из GHCR и Docker Hub могут работать и загружаться на одном роутере:
+
+```text
+ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1
+registry-1.docker.io/wiktorbgu/mihomo-mikrotik:latest
+```
+
+Если используется полное имя с реестром, переключать глобальный registry-url для каждой загрузки не требуется. Короткие имена без реестра используют registry-url. Можно оставить Docker Hub реестром по умолчанию, а Jackett всегда указывать с ghcr.io:
+
+```routeros
+/container/set [/container/find where interface=veth4jackett] remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1
+/container/config/set registry-url=https://registry-1.docker.io
+```
+
+Это меняет параметры будущих загрузок, без остановки работающего контейнера. Поддержка реестра в remote-image указана в [журнале RouterOS](https://forum.mikrotik.com/t/v7-18-2-stable-is-released/182200).
