@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [Dockerfile, minimize-python.py, retire-variants.py, bridge.py, network.py, test_network.py, check-network.sh, bridge-start.sh, exec-mihomo.py, test_bridge.py, .dockerignore, .github/workflows/publish.yml]
+    paths: [Dockerfile, minimize-python.py, bridge.py, network.py, test_network.py, check-network.sh, bridge-start.sh, exec-mihomo.py, test_bridge.py, .dockerignore, .github/workflows/publish.yml]
 permissions:
   contents: read
   packages: write
@@ -75,8 +75,3 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=Jackett Mihomo Xray
             org.opencontainers.image.description=Mihomo 1.19.32 and Xray 26.10.10 with ENV subscriptions and Zashboard
-      - name: Remove retired light and compact package versions
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO_OWNER: ${{ github.repository_owner }}
-        run: python3 retire-variants.py

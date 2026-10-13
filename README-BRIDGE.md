@@ -1,9 +1,21 @@
 # Полная сборка Mihomo + Xray — установка на MikroTik
 
 Образ: `ghcr.io/itnetsystem/jackett-mihomo-xray:latest`.
-Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARMv7 (ARM 32-bit, включая RB4011), ARM64 и AMD64.
+Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARMv7 (32-bit), ARM64 и AMD64.
 
 Подключения добавляются через ENV. SUB1/SUB2 содержат адреса подписок, SRV1/SRV2 — отдельные ссылки. Источники отображаются отдельными провайдерами SUB1, SUB2, SRV1, SRV2 и обновляются автоматически; общая группа SELECTOR включает их все. Файлы конфигурации для обычной подписки создаются контейнером.
+
+## Порядок установки
+
+1. [Подготовьте RouterOS и накопитель](#1-подготовка-routeros-и-хранилища).
+2. [Подключите сеть контейнера](#2-сеть-контейнера).
+3. [Добавьте подписку в ENV](#3-env-подписка-и-веб-панель).
+4. [Загрузите и запустите образ](#4-загрузка-и-запуск).
+5. [Откройте веб-панель](#5-веб-панель-и-подключение).
+
+Дополнительно: [сеть](#как-работает-сеть), [ENV](#справочник-env), [протоколы](#протоколы-и-форматы), [обновление](#обновление-образа), [удаление](#удаление-контейнера).
+
+В примерах: контейнер `jackett-mihomo-xray`, интерфейс `veth1jackett`, ENV-список `jackett`, папка `containers/jackett`. IP и шлюз — примеры: подставьте свою сеть, не меняйте работающие адреса.
 
 ## Что означают list, key и value
 
@@ -43,13 +55,13 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARMv7 (ARM 32-bit, вкл
 
 ## 2. Сеть контейнера
 
-Используется мост **Docker Bridge** и интерфейс **veth4jackett**. Если они уже созданы, не создавайте повторно и сохраните их действующие IP/шлюз. Посмотрите текущую сеть:
+Используется мост **Docker Bridge** и интерфейс **veth1jackett**. Если они уже созданы, не создавайте повторно и сохраните их действующие IP/шлюз. Посмотрите текущую сеть:
 
 ```routeros
 /interface/bridge/print where name="Docker Bridge"
 /ip/address/print where interface="Docker Bridge"
-/interface/veth/print detail where name=veth4jackett
-/interface/bridge/port/print where interface=veth4jackett
+/interface/veth/print detail where name=veth1jackett
+/interface/bridge/port/print where interface=veth1jackett
 ```
 
 В командах используется сеть **172.31.203.0/24**: шлюз 172.31.203.254, контейнер 172.31.203.4. Если Docker Bridge уже обслуживает другую сеть, используйте свободный адрес из неё и существующий шлюз; замените адреса в командах NAT/firewall и URL панели. Команды создания выполняйте только для отсутствующих элементов:
@@ -57,8 +69,8 @@ Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARMv7 (ARM 32-bit, вкл
 ```routeros
 /interface/bridge/add name="Docker Bridge"
 /ip/address/add address=172.31.203.254/24 interface="Docker Bridge"
-/interface/veth/add name=veth4jackett address=172.31.203.4/24 gateway=172.31.203.254
-/interface/bridge/port/add bridge="Docker Bridge" interface=veth4jackett
+/interface/veth/add name=veth1jackett address=172.31.203.4/24 gateway=172.31.203.254
+/interface/bridge/port/add bridge="Docker Bridge" interface=veth1jackett
 /ip/firewall/nat/add chain=srcnat src-address=172.31.203.0/24 out-interface-list=WAN action=masquerade comment="Jackett container Internet"
 ```
 
@@ -121,26 +133,20 @@ WireGuard работает через пользовательский сете�
 
 ## 4. Загрузка и запуск
 
-После подготовки сети и ENV установка выполняется одной командой:
+После подготовки сети и ENV создайте контейнер. Автозапуск включите после проверки:
 
 ```routeros
-/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest envlists=jackett interface=veth4jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=yes
+/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest envlists=jackett interface=veth1jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=no
 ```
 
 Дождитесь завершения downloading/extracting:
 
 ```routeros
 /container/print detail
-/container/start [/container/find where interface=veth4jackett]
+/container/start [/container/find where interface=veth1jackett]
 ```
 
 В команде используется envlists=jackett. Mountlist этой установке не нужен.
-
-Чтобы переименовать уже установленный контейнер, без остановки и переустановки:
-
-```routeros
-/container/set [/container/find where interface=veth4jackett] name=jackett-mihomo-xray
-```
 
 ## 5. Веб-панель и подключение
 
@@ -150,11 +156,11 @@ WireGuard работает через пользовательский сете�
 
 Для выбора подключения: SELECTOR → MANUAL → нужный узел. HTTP/SOCKS-прокси доступен на **172.31.203.4:1080**. Установка контейнера сама по себе не направляет весь трафик LAN через VPN. Прозрачная маршрутизация на RouterOS настраивается отдельно для выбранных устройств.
 
-## Единая сеть на RB4011 и RB5009
+## Как работает сеть
 
 Сборка использует один режим на ARMv7, ARM64 и AMD64, без автоматического выбора по nftables.
 
-По умолчанию `JACKETT_NETWORK_MODE=tun`. Mihomo создаёт `Meta`, но не устанавливает автоматические глобальные маршруты. Запускатель устанавливает отдельную таблицу2022 и правила12000–12020 **только для пакетов, пришедших через физический интерфейс контейнера**. Собственные соединения Xray, загрузка подписок, DNS и ответы GUI идут через исходный шлюз. Локальные адреса, связанные сети и частные сети исключены из VPN-перехвата. Таблица `main` и стандартный шлюз не заменяются.
+По умолчанию `JACKETT_NETWORK_MODE=tun`. Mihomo создаёт `Meta`, но не устанавливает автоматические глобальные маршруты. Запускатель устанавливает отдельную таблицу 2022 и правила 12000–12020 **только для пакетов, пришедших через физический интерфейс контейнера**. Собственные соединения Xray, загрузка подписок, DNS и ответы GUI идут через исходный шлюз. Локальные адреса, связанные сети и частные сети исключены из VPN-перехвата. Таблица `main` и стандартный шлюз не заменяются.
 
 RouterOS продолжает выбирать трафик, который направляется на IP контейнера через свою таблицу `vpn`. Сам IP/сеть контейнера не должен попадать под такие правила RouterOS. Требуется один физический интерфейс с default gateway. Отсутствие TUN или ошибка настройки останавливают контейнер, вместо установки небезопасного глобального маршрута.
 
@@ -164,11 +170,17 @@ RouterOS продолжает выбирать трафик, который на
 /container/envs/add list=jackett key=JACKETT_NETWORK_MODE value=proxy
 ```
 
-Если ключ уже существует, измените значение вместо создания дубликата. Режим `proxy` оставляет GUI9090 и HTTP/SOCKS1080, не создаёт TUN и правил маршрутизации. Старые ENV `TUN`, `TUN_AUTO_ROUTE`, `TUN_AUTO_REDIRECT` больше не выбирают режим; их можно удалить. Значения `true` для авто-маршрутов принудительно заменяются безопасными `false`.
+Если ключ уже существует, измените значение вместо создания дубликата. Режим `proxy` оставляет GUI на порту 9090 и HTTP/SOCKS на порту 1080, не создаёт TUN и правил маршрутизации. Старые ENV `TUN`, `TUN_AUTO_ROUTE`, `TUN_AUTO_REDIRECT` больше не выбирают режим; их можно удалить. Значения `true` для авто-маршрутов принудительно заменяются безопасными `false`.
 
 При первом обновлении проверяйте локально, сохранив возможность входа в MikroTik по MAC. Оставьте автозапуск выключенным до проверки GUI, подписок, SOCKS и перенаправления с обычного LAN-устройства. Проверки сборки на Linux не заменяют проверку реального RouterOS.
 
-## ENV
+После проверки GUI, подписок и выбранного способа подключения включите автозапуск:
+
+```routeros
+/container/set [/container/find where name=jackett-mihomo-xray] start-on-boot=yes
+```
+
+## Справочник ENV
 
 | Переменная | Назначение |
 |---|---|
@@ -214,14 +226,21 @@ MTProto — Telegram-прокси, а не VPN для произвольных �
 ## Обновление образа
 
 ```routeros
-/container/stop [/container/find where interface=veth4jackett]
-/container/repull [/container/find where interface=veth4jackett]
+/container/set [/container/find where name=jackett-mihomo-xray] start-on-boot=no
+/container/stop [/container/find where name=jackett-mihomo-xray]
+/container/print
 ```
 
-Дождитесь загрузки/распаковки, затем:
+Дождитесь состояния `STOPPED`, затем загрузите обновление:
 
 ```routeros
-/container/start [/container/find where interface=veth4jackett]
+/container/repull [/container/find where name=jackett-mihomo-xray]
+```
+
+После окончания загрузки и распаковки запустите:
+
+```routeros
+/container/start [/container/find where interface=veth1jackett]
 ```
 
 Для перехода на другой тег перед repull измените remote-image через `/container/set`. ENV сохраните; перед repull сохраните нужные конфигурации и HWID: данные внутри root-dir могут быть заменены при переустановке. Не используйте один root-dir для нескольких контейнеров.
@@ -231,17 +250,17 @@ MTProto — Telegram-прокси, а не VPN для произвольных �
 Отдельный скрипт не нужен. Остановите контейнер, дождитесь состояния stopped и удалите его через Remove в WinBox или командой:
 
 ```routeros
-/container/stop [/container/find where interface=veth4jackett]
+/container/stop [/container/find where interface=veth1jackett]
 /container/print
 ```
 
 После остановки:
 
 ```routeros
-/container/remove [/container/find where interface=veth4jackett]
+/container/remove [/container/find where interface=veth1jackett]
 ```
 
-Дождитесь завершения удаления: RouterOS удаляет root-dir **containers/jackett** вместе с внутренними конфигурациями, кешем и HWID. Отдельный скрипт очистки не нужен. Общая /containers, Docker Bridge, veth4jackett и ENV jackett сохраняются.
+Дождитесь завершения удаления: RouterOS удаляет root-dir **containers/jackett** вместе с внутренними конфигурациями, кешем и HWID. Отдельный скрипт очистки не нужен. Общая /containers, Docker Bridge, veth1jackett и ENV jackett сохраняются.
 
 При переустановке используйте существующие ENV и выполните container/add. HWID будет создан заново; для подписок с привязкой устройства можно заранее задать прежний HWID через ENV.
 
@@ -269,7 +288,7 @@ registry-1.docker.io/wiktorbgu/mihomo-mikrotik:latest
 Если используется полное имя с реестром, переключать глобальный registry-url для каждой загрузки не требуется. Короткие имена без реестра используют registry-url. Можно оставить Docker Hub реестром по умолчанию, а Jackett всегда указывать с ghcr.io:
 
 ```routeros
-/container/set [/container/find where interface=veth4jackett] remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest
+/container/set [/container/find where interface=veth1jackett] remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest
 /container/config/set registry-url=https://registry-1.docker.io
 ```
 
@@ -277,7 +296,7 @@ registry-1.docker.io/wiktorbgu/mihomo-mikrotik:latest
 
 ## Размер образа
 
-Сохранены Mihomo 1.19.32, Xray 26.10.10 и базы Xray GeoIP/GeoSite. Стандартная библиотека Python хранится в поддерживаемом Python ZIP-формате; удалён предкомпилированный кеш, запись нового pycache отключена. Измеренный размер чистой файловой системы AMD64 уменьшился примерно со 164 до **156 МиБ**. Интерфейс дополнительно скачивается при запуске. Реестр передаёт сжатые слои, а распаковка требует дополнительного свободного места.
+Сохранены Mihomo 1.19.32, Xray 26.10.10 и базы Xray GeoIP/GeoSite. Стандартная библиотека Python хранится в поддерживаемом Python ZIP-формате; удалён предкомпилированный кеш, запись нового pycache отключена. Размер файловой системы зависит от архитектуры и версии сборки; ориентируйтесь примерно на 160 МиБ до загрузки интерфейса и кеша. Интерфейс дополнительно скачивается при запуске. Реестр передаёт сжатые слои, а распаковка требует дополнительного свободного места.
 
-На внутренний накопитель hAP ax² 128 МБ образ не помещается. Хранение всего root-dir в RAM здесь не предлагается: после перезагрузки файлы исчезают. Временную распаковку можно вынести в RAM отдельно, но это не уменьшает размер установленного контейнера.
+Используйте постоянный накопитель. Для скачивания и распаковки нужно больше свободного места, чем занимает готовая файловая система. Веб-панель и кеш занимают дополнительное место.
 
