@@ -201,46 +201,28 @@ MTProto — Telegram-прокси, а не VPN для произвольных �
 
 Для перехода на другой тег перед repull измените remote-image через `/container/set`. ENV и writable каталог сохраняйте. Не используйте один root-dir для нескольких контейнеров.
 
-## Удаление контейнера вместе с папками
+## Удаление контейнера
 
-Удаление через меню container само по себе не является командой очистки всех mounted-данных. Для удаления контейнера **и /containers/jackett** используйте отдельный скрипт ниже. Он удаляет конфигурацию, кеш и HWID вместе с файлами образа. ENV jackett, интерфейс veth4jackett и общий Docker Bridge сохраняются для повторной установки. Общая папка /containers не удаляется.
-
-Добавьте скрипт один раз:
+Отдельный скрипт не нужен. Остановите контейнер, дождитесь состояния stopped и удалите его через Remove в WinBox или командой:
 
 ```routeros
-/system/script/add name=jackett-remove policy=read,write,test source={
-    :local cid [/container/find where interface=veth4jackett]
-    :if ([:len $cid] > 1) do={ :error "More than one container on veth4jackett" }
-    :if ([:len $cid] = 1) do={
-        :if ([/container/get $cid root-dir] != "containers/jackett/root") do={ :error "Unexpected root-dir; cleanup stopped" }
-        /container/set $cid start-on-boot=no
-        /container/stop $cid
-        :local tries 0
-        :while (([/container/get $cid status] != "stopped") && ($tries < 60)) do={ :delay 1s; :set tries ($tries + 1) }
-        :if ([/container/get $cid status] != "stopped") do={ :error "Container did not stop; files kept" }
-        /container/remove $cid
-        :set tries 0
-        :while (([:len [/container/find where interface=veth4jackett]] > 0) && ($tries < 60)) do={ :delay 1s; :set tries ($tries + 1) }
-    }
-    :if ([:len [/container/find where interface=veth4jackett]] > 0) do={ :error "Container is still deleting; files kept" }
-    :foreach other in=[/container/find] do={
-        :local otherRoot [/container/get $other root-dir]
-        :if ($otherRoot ~ "^/?containers/jackett(/|$)") do={ :error "Another container uses this folder; files kept" }
-    }
-    /file/remove [/file/find where name="containers/jackett"]
-    :put "Jackett container and its folder removed"
-}
+/container/stop [/container/find where interface=veth4jackett]
+/container/print
 ```
 
-Затем полное удаление выполняется одной командой:
+После остановки:
 
 ```routeros
-/system/script/run jackett-remove
+/container/remove [/container/find where interface=veth4jackett]
 ```
 
-Если контейнер уже удалён вручную, тот же скрипт очистит оставшуюся папку. Если RouterOS сообщает, что файлы ещё заняты, дождитесь завершения удаления и повторите запуск. Команды скрипта нужно проверить на своей версии RouterOS; здесь они не выполнялись на роутере. Скрипт не вызывается автоматически при нажатии Remove в WinBox: для общей очистки запускайте jackett-remove.
+Дождитесь завершения удаления. Каталог файлов контейнера, указанный в root-dir — **/containers/jackett/root** — удаляется RouterOS при штатном удалении контейнера.
 
-Для переустановки заново выполните создание папок из шага 1 и команду container/add; существующие ENV и mountlist повторно не добавляйте. Удаление HWID создаст новый идентификатор при следующем запуске.
+**/containers/jackett/config — отдельная папка mount**, в которой сохраняются настройки, HWID и кеш подписки. Она вынесена за root-dir для сохранения данных при переустановке. Родительская /containers/jackett может остаться из-за config/tmp; это не оставшиеся файлы образа.
+
+Если нужно стереть также все сохранённые данные Jackett, после завершения удаления контейнера удалите **/containers/jackett** в Files. Общую /containers не удаляйте: там могут находиться другие контейнеры. При следующей установке HWID будет создан заново.
+
+Общий Docker Bridge, интерфейс veth4jackett, ENV jackett и mountlist сохраняются. Для переустановки используйте прежние ENV и mountlist, подготовьте папки по шагу 1 и выполните container/add.
 
 ## Надёжность
 
