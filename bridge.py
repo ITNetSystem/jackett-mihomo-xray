@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 import re
 import signal
+import socket
+import ssl
 import subprocess
 import sys
 import threading
@@ -80,6 +82,19 @@ def stream(q, host):
     allowed = {'type','network','security','sni','fp','pbk','sid','spx','alpn','allowInsecure','insecure','path','host','mode','extra','serviceName','authority','ed','eh','seed','headerType','flow','encryption','x_padding_bytes','xPaddingBytes','scMaxEachPostBytes','scMinPostsIntervalMs','uplinkChunkSize','support-x25519mlkem768','pqv','ech','vcn','pcs','fm'}
     if set(q)-allowed: raise Invalid('Unknown URI parameter; use Xray JSON to preserve it')
     return s
+
+def source_error(error):
+    """Explain network failures without logging URLs or credential-bearing text."""
+    if isinstance(error, urllib.error.HTTPError): return 'HTTP '+str(error.code)
+    reason = error.reason if isinstance(error, urllib.error.URLError) else error
+    if isinstance(reason, ssl.SSLCertVerificationError): return 'TLS certificate verification failed'
+    if isinstance(reason, ssl.SSLError): return 'TLS handshake failed'
+    if isinstance(reason, socket.gaierror): return 'DNS resolution failed'
+    if isinstance(reason, TimeoutError): return 'connection/read timed out; check gateway, NAT, firewall and hairpin'
+    if isinstance(reason, ConnectionRefusedError): return 'connection refused'
+    if isinstance(reason, ConnectionResetError): return 'connection reset'
+    if isinstance(reason, OSError): return 'network error (errno '+str(reason.errno)+')'
+    return type(error).__name__
 
 def uri_profile(link):
     # WireGuard keys are base64, not form data. Accept raw / + = in
@@ -242,8 +257,8 @@ class Bridge:
                 pending_cache.append((cache,parsed))
             except Exception as e:
                 if isinstance(e,urllib.error.HTTPError) and e.code in (401,403,404): raise AccessRejected('Subscription access rejected: '+key) from None
-                if not cache.exists(): raise Invalid('Cannot load '+key+' ('+type(e).__name__+')') from None
-                print('Keeping last valid source '+key+' ('+type(e).__name__+')',flush=True)
+                if not cache.exists(): raise Invalid('Cannot load '+key+' ('+source_error(e)+')') from None
+                print('Keeping last valid source '+key+' ('+source_error(e)+')',flush=True)
                 parsed=json.loads(cache.read_text())
             for index,(name,config) in enumerate(parsed[0]):
                 identity=key+':'+name+':'+str(index)
@@ -323,7 +338,7 @@ class Bridge:
             if time.monotonic()-last>=interval:
                 try: self.refresh()
                 except AccessRejected: raise
-                except Exception as e: print('Refresh failed; retaining active configurations ('+type(e).__name__+')',flush=True)
+                except Exception as e: print('Refresh failed; retaining active configurations ('+source_error(e)+')',flush=True)
                 last=time.monotonic()
         server.shutdown()
 

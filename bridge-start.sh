@@ -29,7 +29,7 @@ trap cleanup TERM INT EXIT
 ready=0
 for attempt in $(seq 1 180); do
     kill -0 "$bridge_pid" 2>/dev/null || { echo 'Subscription adapter failed'; exit 1; }
-    if wget -q -O /dev/null http://127.0.0.1:18890/ready; then ready=1; break; fi
+    if wget -q -O /dev/null http://127.0.0.1:18890/ready 2>/dev/null; then ready=1; break; fi
     sleep 1
 done
 [ "$ready" = 1 ] || { echo 'Subscription adapter startup timed out'; exit 1; }

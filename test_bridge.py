@@ -2,7 +2,7 @@ import base64
 import copy
 import json
 import unittest
-from bridge import Invalid, local_config, parse_payload, uri_profile
+from bridge import Invalid, local_config, parse_payload, uri_profile, source_error
 
 ID='11111111-1111-4111-8111-111111111111'
 class ConversionTests(unittest.TestCase):
@@ -57,6 +57,16 @@ class ConversionTests(unittest.TestCase):
                     self.assertEqual(w['peers'][0]['endpoint'],'[2001:db8::1]:51820')
                     profiles,_=parse_payload(base64.b64encode(link.encode()).decode(),'SUB1')
                     self.assertEqual(profiles[0][1]['outbounds'][0]['settings'],w)
+
+    def test_network_error_diagnostics_do_not_expose_url(self):
+        import socket, ssl, urllib.error
+        cases=[(socket.gaierror(-2,'private-url'),'DNS resolution failed'),
+               (TimeoutError('private-url'),'connection/read timed out'),
+               (ssl.SSLCertVerificationError('private-url'),'TLS certificate verification failed')]
+        for reason,expected in cases:
+            message=source_error(urllib.error.URLError(reason))
+            self.assertIn(expected,message)
+            self.assertNotIn('private-url',message)
 
     def test_json_not_native_yaml(self):
         _,native=parse_payload('{"outbounds":[{"protocol":"masque","settings":{"address":"vpn.example","port":443}}]}','XRAY_JSON1')
