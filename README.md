@@ -53,3 +53,7 @@ Xray обслуживает VLESS, VMess, Trojan, Shadowsocks, SOCKS/HTTP и д�
 Mihomo, Xray и ENV сохранены; встроенные базы Xray GeoIP/GeoSite исключены.
 Чистый образ AMD64 около 138 МиБ вместо 164 МиБ, плюс скачиваемый UI и рабочие файлы.
 Для накопителя hAP ax² 128 МБ этого недостаточно. Подробности и ограничения — в [инструкции](README-BRIDGE.md#отдельный-light-образ).
+
+### Compact: без Mihomo
+
+`ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-compact-xray26.10.10-v1` — Xray, ENV-подписки и базовый совместимый API для Zashboard. Чистый образ около 76 МиБ на AMD64, UI дополнительно около 8 МиБ. Это отдельный вариант с ограниченным API; протоколы только Mihomo недоступны. SOCKS 1080 и HTTP 1081 разделены, собственного DNS-сервера нет. [Установка и ограничения](README-COMPACT.md).

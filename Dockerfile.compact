@@ -1,0 +1,12 @@
+FROM ghcr.io/xtls/xray-core:26.10.10@sha256:ac00cba4be8f428fc65c8c9a4e4c8fa55e3f6270d8a8d54316100ff3946899ce AS xray
+FROM alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9a8c010a0
+RUN for attempt in 1 2 3 4 5; do \
+      apk add --no-cache python3 py3-yaml ca-certificates tini && break; \
+      [ "$attempt" -lt 5 ] || exit 1; sleep 5; \
+    done && \
+    find /usr/lib/python* -type d -name __pycache__ -prune -exec rm -rf {} + && \
+    rm -rf /usr/lib/python*/ensurepip /usr/lib/python*/idlelib /usr/lib/python*/turtledemo /usr/lib/python*/test
+COPY --from=xray /usr/local/bin/xray /usr/local/bin/xray
+COPY bridge.py compact.py /usr/local/lib/jackett/
+ENV PYTHONDONTWRITEBYTECODE=1 WORKDIR=/etc/jackett UI_PORT=9090 MIXED_PORT=1080 HTTP_PORT=1081
+ENTRYPOINT ["tini","--","python3","/usr/local/lib/jackett/compact.py"]

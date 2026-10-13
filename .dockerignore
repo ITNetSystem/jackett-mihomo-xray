@@ -10,3 +10,6 @@
 !bridge-start.sh
 
 !Dockerfile.light
+
+!Dockerfile.compact
+!compact.py
