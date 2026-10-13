@@ -46,3 +46,10 @@ Xray обслуживает VLESS, VMess, Trojan, Shadowsocks, SOCKS/HTTP и д�
 ## Удаление
 
 Остановите контейнер и удалите через Remove в WinBox — отдельный скрипт не нужен. Root-dir удаляется при штатном удалении. Все данные находятся внутри одного root-dir containers/jackett и удаляются вместе с контейнером; [подробнее об удалении](README-BRIDGE.md#удаление-контейнера).
+
+### Light
+
+Отдельный образ: `ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-light-xray26.10.10-v1`.
+Mihomo, Xray и ENV сохранены; встроенные базы Xray GeoIP/GeoSite исключены.
+Чистый образ AMD64 около 138 МиБ вместо 164 МиБ, плюс скачиваемый UI и рабочие файлы.
+Для накопителя hAP ax² 128 МБ этого недостаточно. Подробности и ограничения — в [инструкции](README-BRIDGE.md#отдельный-light-образ).

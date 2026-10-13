@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [Dockerfile, start.sh, Dockerfile.mikrotik, mikrotik-start.sh, Dockerfile.bridge, bridge.py, bridge-start.sh, exec-mihomo.py, test_bridge.py, .dockerignore, .github/workflows/publish.yml]
+    paths: [Dockerfile, start.sh, Dockerfile.mikrotik, mikrotik-start.sh, Dockerfile.bridge, Dockerfile.light, bridge.py, bridge-start.sh, exec-mihomo.py, test_bridge.py, .dockerignore, .github/workflows/publish.yml]
 permissions:
   contents: read
   packages: write
@@ -75,3 +75,19 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Publish light ENV subscription bridge without bundled Geo databases
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.light
+          platforms: linux/arm64,linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ steps.image.outputs.name }}:mikrotik-light-xray26.10.10-v1
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.description=Light Mihomo and Xray ENV bridge without bundled Xray GeoIP/GeoSite

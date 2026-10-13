@@ -8,3 +8,5 @@
 !bridge.py
 !exec-mihomo.py
 !bridge-start.sh
+
+!Dockerfile.light
