@@ -1,4 +1,6 @@
-# Jackett Mihomo + Xray — чистая установка на MikroTik
+# Полная сборка Mihomo + Xray — установка на MikroTik
+
+**Для новой компактной сборки без Mihomo используйте [инструкцию Compact](README-COMPACT.md).** Ниже инструкция именно для полной версии; её тег и возможности отличаются.
 
 Образ: `ghcr.io/itnetsystem/jackett-mihomo-xray:mikrotik-all-xray26.10.10-v1`.
 Mihomo 1.19.32 + Xray 26.10.10. Архитектуры ARM64 и AMD64.
