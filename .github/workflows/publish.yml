@@ -38,7 +38,12 @@ jobs:
             docker buildx build --platform "$platform" --load -t jackett-network-check:local .
             docker run --rm --platform "$platform" --entrypoint /usr/bin/mihomo jackett-network-check:local -v
             docker run --rm --platform "$platform" --entrypoint /usr/local/bin/xray jackett-network-check:local version
-            docker run --rm --platform "$platform" --cap-add NET_ADMIN --sysctl net.ipv4.conf.all.rp_filter=0 --sysctl net.ipv4.conf.default.rp_filter=0 --entrypoint sh jackett-network-check:local /usr/local/bin/jackett-check-network
+            docker run --rm --platform "$platform" --entrypoint python3 jackett-network-check:local -c "import sys; sys.path.insert(0, '/usr/local/lib/jackett'); from network import prepare_environment, policy_rules; e={}; assert prepare_environment(e)=='tun'; assert e['TUN_AUTO_ROUTE']=='false'; assert all('iif' in r for r in policy_rules('eth0'))"
+            # QEMU user emulation cannot dump routing rules (RTM_GETRULE).
+            # Verify kernel routes natively; emulate only ARM user-space binaries.
+            if [ "$platform" = linux/amd64 ]; then
+              docker run --rm --cap-add NET_ADMIN --sysctl net.ipv4.conf.all.rp_filter=0 --sysctl net.ipv4.conf.default.rp_filter=0 --entrypoint sh jackett-network-check:local /usr/local/bin/jackett-check-network
+            fi
           done
       - name: Build ARMv7 for validation
         uses: docker/build-push-action@v6
