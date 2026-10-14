@@ -35,7 +35,7 @@ jobs:
       - name: Validate all architectures before publishing
         run: |
           for platform in linux/arm/v7 linux/arm64 linux/amd64; do
-            docker buildx build --platform "$platform" --load -t jackett-network-check:local .
+            docker buildx build --target runtime --platform "$platform" --load -t jackett-network-check:local .
             docker run --rm --platform "$platform" --entrypoint /usr/bin/mihomo jackett-network-check:local -v
             docker run --rm --platform "$platform" --entrypoint /usr/local/bin/xray jackett-network-check:local version
             docker run --rm --platform "$platform" --entrypoint python3 jackett-network-check:local -c "import sys; sys.path.insert(0, '/usr/local/lib/jackett'); from network import prepare_environment, policy_rules; e={}; assert prepare_environment(e)=='tun'; assert e['TUN_AUTO_ROUTE']=='false'; assert all('iif' in r for r in policy_rules('eth0'))"
@@ -50,6 +50,7 @@ jobs:
         with:
           context: .
           file: Dockerfile
+          target: runtime
           platforms: linux/arm/v7
           load: true
           tags: jackett-armv7-check:local
@@ -65,6 +66,7 @@ jobs:
         with:
           context: .
           file: Dockerfile
+          target: runtime
           platforms: linux/arm64,linux/amd64,linux/arm/v7
           push: true
           provenance: false
@@ -75,3 +77,27 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.title=Jackett Mihomo Xray
             org.opencontainers.image.description=Mihomo 1.19.32 and Xray 26.10.10 with ENV subscriptions and Zashboard
+      - name: Validate bundled GUI
+        run: |
+          docker buildx build --target with-ui --platform linux/amd64 --load -t jackett-ui-check:local .
+          docker run -d --name ui-check -e JACKETT_NETWORK_MODE=proxy -e 'XRAY_JSON1={"outbounds":[{"tag":"proxy","protocol":"freedom"}]}' jackett-ui-check:local
+          for attempt in $(seq 1 60); do
+            docker exec ui-check wget -q -O /tmp/page http://127.0.0.1:9090/ui/ && break || sleep 1
+          done
+          docker exec ui-check sh -c 'test -s /tmp/page && test -f /etc/mihomo/ui/index.html'
+          if docker logs ui-check 2>&1 | grep -q 'External UI downloading'; then exit 1; fi
+          docker rm -f ui-check
+      - name: Publish image with bundled GUI
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: with-ui
+          platforms: linux/arm64,linux/amd64,linux/arm/v7
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ steps.image.outputs.name }}:with-ui
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}

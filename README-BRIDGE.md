@@ -223,6 +223,38 @@ RouterOS продолжает выбирать трафик, который на
 
 MTProto — Telegram-прокси, а не VPN для произвольных приложений. Он здесь не эмулируется. Неподдерживаемые ядрами протоколы эта сборка не изобретает. Реальный gRPC/WS/mKCP зависит также от сервера: существующие серверные инбаунды не создаются автоматически.
 
+## Образ с готовым GUI
+
+Если контейнер не может скачать интерфейс с GitHub, используйте:
+
+```text
+ghcr.io/itnetsystem/jackett-mihomo-xray:with-ui
+```
+
+Zashboard 3.29.1 включён в образ; ZIP закреплён по версии и SHA256. При запуске интерфейс копируется в каталог UI, и скачивание с GitHub не требуется. Подписки всё равно требуют доступа к своим серверам. Архитектуры, ENV, сеть и протоколы совпадают с `latest`. Дополнительное место занимает сам интерфейс и его рабочая копия. Обновление версии GUI выполняется выпуском нового образа.
+
+Для новой установки замените `:latest` на `:with-ui` в команде `container/add`. Для существующего контейнера:
+
+```routeros
+/container/set [/container/find where name=jackett-mihomo-xray] start-on-boot=no
+/container/stop [/container/find where name=jackett-mihomo-xray]
+```
+
+Дождитесь `STOPPED`. Перед обновлением сохраните нужные конфигурации и HWID, затем:
+
+```routeros
+/container/set [/container/find where name=jackett-mihomo-xray] remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:with-ui
+/container/repull [/container/find where name=jackett-mihomo-xray]
+```
+
+После окончания распаковки:
+
+```routeros
+/container/start [/container/find where name=jackett-mihomo-xray]
+```
+
+Существующий `EXTERNAL_UI_URL` можно оставить: встроенный `index.html` уже есть, поэтому стартовая загрузка не требуется. Автозапуск включите после проверки. GUI — [Zashboard](https://github.com/Zephyruso/zashboard).
+
 ## Обновление образа
 
 ```routeros

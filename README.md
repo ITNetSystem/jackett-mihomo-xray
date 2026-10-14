@@ -1,6 +1,8 @@
 # Jackett Mihomo + Xray для MikroTik
 
 Образ: **`ghcr.io/itnetsystem/jackett-mihomo-xray:latest`**.
+Дополнительный образ: **`ghcr.io/itnetsystem/jackett-mihomo-xray:with-ui`** — со встроенным Zashboard 3.29.1, без загрузки GUI при запуске. Поддерживает те же архитектуры, ENV и протоколы. Он больше на размер встроенного интерфейса.
+
 Имя контейнера: **`jackett-mihomo-xray`**.
 
 Полная сборка: Mihomo 1.19.32 + Xray 26.10.10, ARMv7 (32-bit), ARM64 и AMD64. Сохранены GUI Zashboard, SELECTOR, MANUAL, AUTO, FALLBACK, LOADBALANCE, протоколы обоих ядер и базы Xray GeoIP/GeoSite.

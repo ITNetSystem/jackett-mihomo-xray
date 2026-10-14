@@ -7,6 +7,16 @@ export JACKETT_NETWORK_MODE="${JACKETT_NETWORK_MODE:-tun}"
 case "$JACKETT_NETWORK_MODE" in tun|proxy) ;; *) echo 'Invalid network mode'; exit 1;; esac
 export TUN=1 TUN_AUTO_ROUTE=false TUN_AUTO_REDIRECT=false
 mkdir -p "$WORKDIR/user_sh"
+if [ "${JACKETT_BUNDLED_UI:-0}" = 1 ]; then
+    case "${EXTERNAL_UI_PATH:-ui}" in
+        /*) ui_dir="${EXTERNAL_UI_PATH}" ;;
+        *) ui_dir="$WORKDIR/${EXTERNAL_UI_PATH:-ui}" ;;
+    esac
+    mkdir -p "$ui_dir"
+    cp -R /usr/local/share/jackett-ui/. "$ui_dir/"
+    echo 'Bundled Zashboard ready; no startup download required'
+fi
+
 # The adapter consumes SUB/SRV once; the original entrypoint must not duplicate them.
 # The adapter writes one local provider hook per SUB/SRV source after validation.
 # A reused test volume must not insert stale test proxies.
