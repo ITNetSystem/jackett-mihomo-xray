@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+: "${PATH:=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+export PATH
 : "${WORKDIR:=/etc/mihomo}"
 export WORKDIR
 # Force one network mode on every architecture; never let TUN capture Xray sockets.

@@ -15,7 +15,7 @@ COPY --chmod=0755 check-network.sh /usr/local/bin/jackett-check-network
 COPY --chmod=0755 bridge-start.sh /usr/local/bin/jackett-bridge-start
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV XRAY_LOCATION_ASSET=/usr/local/share/xray
-ENTRYPOINT ["tini", "--", "/usr/local/bin/jackett-bridge-start"]
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/jackett-bridge-start"]
 
 FROM runtime AS ui-download
 RUN wget -T 60 -O /tmp/zashboard.zip https://github.com/Zephyruso/zashboard/releases/download/v3.29.1/dist.zip && \
