@@ -13,6 +13,7 @@ COPY --from=xray /usr/local/share/xray/ /usr/local/share/xray/
 COPY bridge.py exec-mihomo.py network.py /usr/local/lib/jackett/
 COPY --chmod=0755 check-network.sh /usr/local/bin/jackett-check-network
 COPY --chmod=0755 bridge-start.sh /usr/local/bin/jackett-bridge-start
+LABEL io.jackett.compatible-3x-ui="3.10.2"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV XRAY_LOCATION_ASSET=/usr/local/share/xray
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/jackett-bridge-start"]
