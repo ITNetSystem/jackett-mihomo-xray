@@ -4,6 +4,7 @@
 !bridge.py
 !exec-mihomo.py
 !bridge-start.sh
+!version-panel.js
 
 !network.py
 !check-network.sh
