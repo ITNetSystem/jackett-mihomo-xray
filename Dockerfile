@@ -1,4 +1,4 @@
-FROM ghcr.io/xtls/xray-core:26.10.10@sha256:ac00cba4be8f428fc65c8c9a4e4c8fa55e3f6270d8a8d54316100ff3946899ce AS xray
+FROM ghcr.io/xtls/xray-core:26.10.21@sha256:d5c3729dfeed7c412af17a63b941c48c76ba68afee5b6184fe4078f8fa8bedcc AS xray
 FROM wiktorbgu/mihomo-mikrotik@sha256:3140540997abafa6bc649ae0cebb42b0e3ffbec9eb1d3cd601edde9d355eb733 AS runtime
 COPY minimize-python.py /tmp/minimize-python.py
 RUN for attempt in 1 2 3 4 5; do \
