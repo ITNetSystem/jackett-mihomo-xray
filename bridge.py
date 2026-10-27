@@ -234,6 +234,7 @@ class Bridge:
         self.work=Path(os.getenv('WORKDIR','/etc/mihomo'))
         self.state=self.work/'.jackett-xray';self.state.mkdir(parents=True,exist_ok=True)
         self.running={};self.proxies=[];self.native=[];self.providers={};self.stop=threading.Event()
+        self.refresh_lock=threading.Lock();self.last_refresh=0.0
         self.sources={k:v for k,v in os.environ.items() if re.fullmatch(r'(SUB|SRV|XRAY_JSON)[0-9]+(?:_[A-Za-z0-9]+)?',k) and v}
         if not self.sources: raise Invalid('Add SUB1, SRV1 or XRAY_JSON1')
         self.hwid=os.getenv('HWID','')
@@ -253,7 +254,15 @@ class Bridge:
             value=raw.decode('utf-8-sig')
         return parse_payload(value,key)
 
-    def refresh(self):
+    def refresh(self,min_age=0):
+        with self.refresh_lock:
+            if min_age and time.monotonic()-self.last_refresh < min_age:
+                return False
+            self._refresh_unlocked()
+            self.last_refresh=time.monotonic()
+            return True
+
+    def _refresh_unlocked(self):
         profiles=[];native=[];pending_cache=[];providers={}
         for key,value in sorted(self.sources.items()):
             # Cache indexed by source, without storing the URL in logs or cache names.
@@ -313,12 +322,10 @@ class Bridge:
                 proc=subprocess.Popen(['/usr/local/bin/xray','run','-config',str(path)])
                 self.running[port]=(proc,digest)
         self.proxies=proxies;self.native=native;self.providers=providers
-        hook=['saved_interval=$PROVIDER_INTERVAL','PROVIDER_INTERVAL=60',
-              '[ -n "$PROVIDERS_BLOCK" ] || PROVIDERS_LIST=""']
+        hook=['[ -n "$PROVIDERS_BLOCK" ] || PROVIDERS_LIST=""']
         for key in sorted(providers):
             hook.append('add_provider '+key+' http http://127.0.0.1:18890/providers/'+key+' false')
             hook.append('PROVIDERS_BLOCK="${PROVIDERS_BLOCK}    proxy: DIRECT\n"')
-        hook.append('PROVIDER_INTERVAL=$saved_interval')
         hook.append('[ "$JACKETT_NETWORK_MODE" != proxy ] || export TUN_IN_AUTOCONFIG=""')
         hook_path=self.work/'user_sh'/'jackett-all-xray.sh'
         hook_path.parent.mkdir(parents=True,exist_ok=True)
@@ -352,6 +359,16 @@ class Bridge:
                 if self.path=='/ready':
                     body=b'{"ready":true}'
                 elif self.path.startswith('/providers/') and self.path[11:] in bridge.providers:
+                    # A provider refresh requested in Zashboard must also fetch
+                    # the upstream subscription. Previously it only reread this
+                    # bridge's old snapshot, so changes appeared after restart.
+                    # Closely grouped provider pulls share one upstream refresh.
+                    try:
+                        bridge.refresh(min_age=5)
+                    except AccessRejected:
+                        bridge.stop.set();self.send_error(503);return
+                    except Exception as e:
+                        print('On-demand refresh failed; retaining active configurations ('+source_error(e)+')',flush=True)
                     body=bridge.provider_body(self.path[11:])
                 elif self.path=='/proxies':
                     # Compatibility view; runtime hooks use separate source endpoints.

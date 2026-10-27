@@ -8,6 +8,9 @@ export WORKDIR
 export JACKETT_NETWORK_MODE="${JACKETT_NETWORK_MODE:-tun}"
 case "$JACKETT_NETWORK_MODE" in tun|proxy) ;; *) echo 'Invalid network mode'; exit 1;; esac
 export TUN=1 TUN_AUTO_ROUTE=false TUN_AUTO_REDIRECT=false
+# The selected top-level mode and MANUAL node are runtime state. Persist them
+# even when an old RouterOS ENV list still contains STORE_SELECTED=false.
+export STORE_SELECTED=true
 mkdir -p "$WORKDIR/user_sh"
 case "${EXTERNAL_UI_PATH:-ui}" in
     /*) ui_dir="${EXTERNAL_UI_PATH}" ;;

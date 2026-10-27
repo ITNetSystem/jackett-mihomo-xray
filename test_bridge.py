@@ -100,6 +100,22 @@ class ConversionTests(unittest.TestCase):
                     self.assertIn('add_provider '+key+' http',hook)
                     self.assertIn('/providers/'+key,hook)
                 self.assertNotIn('add_provider JACKETT_XRAY',hook)
+                self.assertNotIn('PROVIDER_INTERVAL=60',hook)
+
+    def test_on_demand_refresh_is_serialized_and_throttled(self):
+        import threading
+        from unittest.mock import Mock
+        b=Bridge.__new__(Bridge)
+        b.refresh_lock=threading.Lock();b.last_refresh=0.0
+        b._refresh_unlocked=Mock()
+        self.assertTrue(b.refresh(min_age=5))
+        self.assertFalse(b.refresh(min_age=5))
+        b._refresh_unlocked.assert_called_once_with()
+
+    def test_start_forces_selected_mode_persistence(self):
+        from pathlib import Path
+        script=(Path(__file__).parent/'bridge-start.sh').read_text()
+        self.assertIn('export STORE_SELECTED=true',script)
 
     def test_wireguard_uses_tunnel_dns_and_userspace_stack(self):
         key=base64.b64encode(bytes([251])*32).decode()

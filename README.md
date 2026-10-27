@@ -5,7 +5,7 @@
 
 Имя контейнера: **`jackett-mihomo-xray`**.
 
-Полная сборка: Mihomo 1.19.33 + Xray 26.10.21, ARMv7 (32-bit), ARM64 и AMD64. Версии обоих ядер отображаются в Zashboard. Сохранены SELECTOR, MANUAL, AUTO, FALLBACK, LOADBALANCE, протоколы обоих ядер и базы Xray GeoIP/GeoSite.
+Полная сборка: Mihomo 1.19.33 + Xray 26.10.21, ARMv7 (32-bit), ARM64 и AMD64. Версии обоих ядер отображаются в Zashboard. Сохранены SELECTOR, MANUAL, AUTO, FALLBACK, LOADBALANCE, протоколы обоих ядер и базы Xray GeoIP/GeoSite. Ручное обновление provider сразу перечитывает исходную подписку, а выбранный режим и узел MANUAL сохраняются после перезапуска контейнера.
 
 **[Пошаговая инструкция](README-BRIDGE.md)** — сеть, ENV, установка, обновление и удаление.
 
