@@ -3,8 +3,8 @@
   if (document.getElementById(id)) return;
   const badge = document.createElement('div');
   badge.id = id;
-  badge.textContent = 'Mihomo 1.19.33 · Xray 26.10.21';
-  badge.setAttribute('aria-label', 'Версии ядер: Mihomo 1.19.33, Xray 26.10.21');
+  badge.textContent = 'Mihomo 1.19.33 · Xray 26.10.31';
+  badge.setAttribute('aria-label', 'Версии ядер: Mihomo 1.19.33, Xray 26.10.31');
   Object.assign(badge.style, {
     position: 'fixed',
     right: '12px',

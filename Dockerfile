@@ -1,4 +1,4 @@
-FROM ghcr.io/xtls/xray-core:26.10.21@sha256:d5c3729dfeed7c412af17a63b941c48c76ba68afee5b6184fe4078f8fa8bedcc AS xray
+FROM ghcr.io/xtls/xray-core:26.10.31@sha256:ceabeac03a89d991d2a247361825c1d1d2e9c91cd5dc010f298c7dc0c2f325c9 AS xray
 FROM wiktorbgu/mihomo-mikrotik@sha256:af31f8ec3c62f6b7ddfbf04145be6d7a6336ac2b0ba22c0e273326faf4158b1b AS runtime
 COPY minimize-python.py /tmp/minimize-python.py
 RUN for attempt in 1 2 3 4 5; do \
@@ -16,11 +16,11 @@ COPY --chmod=0755 check-network.sh /usr/local/bin/jackett-check-network
 COPY --chmod=0755 bridge-start.sh /usr/local/bin/jackett-bridge-start
 LABEL io.jackett.compatible-3x-ui="3.10.2"
 LABEL io.jackett.mihomo.version="1.19.33"
-LABEL io.jackett.xray.version="26.10.21"
+LABEL io.jackett.xray.version="26.10.31"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV XRAY_LOCATION_ASSET=/usr/local/share/xray
 ENV JACKETT_MIHOMO_VERSION=1.19.33
-ENV JACKETT_XRAY_VERSION=26.10.21
+ENV JACKETT_XRAY_VERSION=26.10.31
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/jackett-bridge-start"]
 
 FROM runtime AS ui-download
