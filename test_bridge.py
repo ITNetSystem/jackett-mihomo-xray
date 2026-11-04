@@ -117,6 +117,15 @@ class ConversionTests(unittest.TestCase):
         script=(Path(__file__).parent/'bridge-start.sh').read_text()
         self.assertIn('export STORE_SELECTED=true',script)
 
+    def test_version_panel_survives_downloaded_ui_replacement(self):
+        from pathlib import Path
+        script=(Path(__file__).parent/'bridge-start.sh').read_text()
+        panel=(Path(__file__).parent/'version-panel.js').read_text()
+        self.assertIn("marker='jackett-versions.js?v=261031-2'",script)
+        self.assertIn('while :; do',script)
+        self.assertIn('MutationObserver(render)',panel)
+        self.assertIn("badge.textContent = 'Mihomo 1.19.33 · Xray 26.10.31'",panel)
+
     def test_wireguard_uses_tunnel_dns_and_userspace_stack(self):
         key=base64.b64encode(bytes([251])*32).decode()
         _,p=uri_profile('wireguard://'+key+'@vpn.example:51820?address=10.7.0.2/32&publickey='+key+'&dns=77.88.8.8,1.1.1.1#WG')

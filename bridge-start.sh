@@ -26,16 +26,34 @@ fi
 # non-interactive badge after either the bundled or downloaded UI is ready so
 # operators can also see which Xray core serves the [Xray] connections.
 install_version_panel() {
+    marker='jackett-versions.js?v=261031-2'
+    announced=0
     for _ in $(seq 1 180); do
         [ -f "$ui_dir/index.html" ] && break
         sleep 1
     done
     [ -f "$ui_dir/index.html" ] || return 0
-    cp /usr/local/share/jackett-version-panel.js "$ui_dir/jackett-versions.js"
-    if ! grep -q 'jackett-versions.js' "$ui_dir/index.html"; then
-        sed -i 's#</body>#<script src="./jackett-versions.js"></script></body>#' "$ui_dir/index.html"
-    fi
-    echo "Version badge ready: Mihomo ${JACKETT_MIHOMO_VERSION:-unknown} · Xray ${JACKETT_XRAY_VERSION:-unknown}"
+    # The downloadable UI can replace index.html after startup. Keep the
+    # local version script present and re-inject it whenever that happens.
+    while :; do
+        if [ -f "$ui_dir/index.html" ]; then
+            if ! cmp -s /usr/local/share/jackett-version-panel.js "$ui_dir/jackett-versions.js"; then
+                cp /usr/local/share/jackett-version-panel.js "$ui_dir/jackett-versions.js"
+            fi
+            if ! grep -q "$marker" "$ui_dir/index.html"; then
+                if grep -qi '</body>' "$ui_dir/index.html"; then
+                    sed -i "s#</body>#<script defer src=\"./$marker\"></script></body>#I" "$ui_dir/index.html"
+                else
+                    printf '\n<script defer src="./%s"></script>\n' "$marker" >> "$ui_dir/index.html"
+                fi
+            fi
+            if [ "$announced" = 0 ]; then
+                echo "Version badge ready: Mihomo ${JACKETT_MIHOMO_VERSION:-unknown} · Xray ${JACKETT_XRAY_VERSION:-unknown}"
+                announced=1
+            fi
+        fi
+        sleep 5
+    done
 }
 install_version_panel &
 version_panel_pid=$!

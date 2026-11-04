@@ -84,7 +84,7 @@ jobs:
           for attempt in $(seq 1 60); do
             docker exec ui-check wget -q -O /tmp/page http://127.0.0.1:9090/ui/ && break || sleep 1
           done
-          docker exec ui-check sh -c 'test -s /tmp/page && test -f /etc/mihomo/ui/index.html && grep -q jackett-versions.js /etc/mihomo/ui/index.html && grep -q "Xray 26.10.31" /etc/mihomo/ui/jackett-versions.js'
+          docker exec ui-check sh -c 'test -s /tmp/page && test -f /etc/mihomo/ui/index.html && grep -q "jackett-versions.js?v=261031-2" /etc/mihomo/ui/index.html && grep -q "Xray 26.10.31" /etc/mihomo/ui/jackett-versions.js'
           if docker logs ui-check 2>&1 | grep -q 'External UI downloading'; then exit 1; fi
           docker rm -f ui-check
       - name: Publish image with bundled GUI
