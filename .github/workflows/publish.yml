@@ -98,15 +98,15 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const versions = await github.paginate(github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg, {
-              package_type: 'container', package_name: context.repo.repo, org: context.repo.owner, per_page: 100
+            const versions = await github.paginate(github.rest.packages.getAllPackageVersionsForPackageOwnedByUser, {
+              package_type: 'container', package_name: context.repo.repo, username: context.repo.owner, per_page: 100
             });
             for (const version of versions) {
               const tags = version.metadata?.container?.tags || [];
               if (tags.includes('with-ui') && !tags.includes('latest')) {
-                await github.rest.packages.deletePackageVersionForOrg({
+                await github.rest.packages.deletePackageVersionForUser({
                   package_type: 'container', package_name: context.repo.repo,
-                  org: context.repo.owner, package_version_id: version.id
+                  username: context.repo.owner, package_version_id: version.id
                 });
               }
             }
