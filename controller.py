@@ -6,9 +6,11 @@ import os
 from pathlib import Path
 import re
 import signal
+import socket
 import subprocess
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlsplit
 
 from bridge import AccessRejected, Bridge, Invalid, atomic, source_error
@@ -16,6 +18,40 @@ from network import activate
 
 VERSION = os.getenv('JACKETT_XRAY_VERSION', 'unknown')
 MODES = {'manual', 'auto', 'fallback'}
+COUNTRIES = (
+    (('rs', 'serbia', 'серби'), 'RS', 'Сербия'),
+    (('ee', 'estonia', 'эстони'), 'EE', 'Эстония'),
+    (('sk', 'slovakia', 'словаки'), 'SK', 'Словакия'),
+    (('ro', 'romania', 'румыни'), 'RO', 'Румыния'),
+    (('de', 'germany', 'германи'), 'DE', 'Германия'),
+    (('nl', 'netherlands', 'нидерланд'), 'NL', 'Нидерланды'),
+    (('fi', 'finland', 'финлянди'), 'FI', 'Финляндия'),
+    (('se', 'sweden', 'швеци'), 'SE', 'Швеция'),
+    (('pl', 'poland', 'польш'), 'PL', 'Польша'),
+    (('fr', 'france', 'франци'), 'FR', 'Франция'),
+    (('gb', 'uk', 'united kingdom', 'британи'), 'GB', 'Великобритания'),
+    (('us', 'usa', 'united states', 'сша'), 'US', 'США'),
+    (('kz', 'kazakhstan', 'казахстан'), 'KZ', 'Казахстан'),
+    (('tr', 'turkey', 'турци'), 'TR', 'Турция'),
+    (('sg', 'singapore', 'сингапур'), 'SG', 'Сингапур'),
+    (('hk', 'hong kong', 'гонконг'), 'HK', 'Гонконг'),
+)
+
+
+def country_for(name):
+    normalized = name.casefold().replace('_', ' ')
+    for aliases, code, title in COUNTRIES:
+        for alias in aliases:
+            if len(alias) == 2:
+                if re.search(r'(^|[^a-zа-я])' + re.escape(alias) + r'([^a-zа-я]|$)', normalized):
+                    return code, title
+            elif alias in normalized:
+                return code, title
+    return '', 'Локация'
+
+
+def flag_for(code):
+    return ''.join(chr(127397 + ord(char)) for char in code) if code else '◎'
 
 
 class Controller:
@@ -47,9 +83,51 @@ class Controller:
         return 'node-' + str(proxy['port'])
 
     def nodes(self):
-        return [{'id': self.node_id(proxy),
-                 'name': re.sub(r'^\[Xray\]\s*', '', proxy['name']),
-                 'port': proxy['port']} for proxy in self.bridge.proxies]
+        result = []
+        for proxy in self.bridge.proxies:
+            name = re.sub(r'^\[Xray\]\s*', '', proxy['name'])
+            code, country = country_for(name)
+            result.append({'id': self.node_id(proxy), 'name': name, 'port': proxy['port'],
+                           'countryCode': code, 'country': country, 'flag': flag_for(code)})
+        return result
+
+    @staticmethod
+    def _recv_exact(connection, length):
+        chunks = bytearray()
+        while len(chunks) < length:
+            chunk = connection.recv(length - len(chunks))
+            if not chunk: raise OSError('SOCKS5 connection closed')
+            chunks.extend(chunk)
+        return bytes(chunks)
+
+    def probe_node(self, node):
+        probe = urlsplit(os.getenv('JACKETT_PROBE_URL', 'https://www.gstatic.com/generate_204'))
+        host = probe.hostname or 'www.gstatic.com'
+        port = probe.port or (443 if probe.scheme == 'https' else 80)
+        encoded = host.encode('idna')
+        if len(encoded) > 255: raise Invalid('Probe hostname is too long')
+        started = time.monotonic()
+        try:
+            with socket.create_connection(('127.0.0.1', node['port']), timeout=8) as connection:
+                connection.settimeout(8)
+                connection.sendall(b'\x05\x01\x00')
+                if self._recv_exact(connection, 2) != b'\x05\x00': raise OSError('SOCKS5 negotiation failed')
+                connection.sendall(b'\x05\x01\x00\x03' + bytes([len(encoded)]) + encoded + port.to_bytes(2, 'big'))
+                header = self._recv_exact(connection, 4)
+                if header[0] != 5 or header[1] != 0: raise OSError('Upstream connection failed')
+                address_length = {1: 4, 4: 16}.get(header[3])
+                if header[3] == 3: address_length = self._recv_exact(connection, 1)[0]
+                if address_length is None: raise OSError('Invalid SOCKS5 response')
+                self._recv_exact(connection, address_length + 2)
+            return {'id': node['id'], 'ok': True, 'latency': round((time.monotonic() - started) * 1000)}
+        except (OSError, TimeoutError):
+            return {'id': node['id'], 'ok': False, 'latency': None}
+
+    def test_nodes(self, requested=''):
+        nodes = [node for node in self.nodes() if not requested or node['id'] == requested]
+        if requested and not nodes: raise Invalid('Unknown node')
+        with ThreadPoolExecutor(max_workers=min(8, len(nodes) or 1)) as pool:
+            return list(pool.map(self.probe_node, nodes))
 
     def _selected(self):
         ids = [node['id'] for node in self.nodes()]
@@ -180,10 +258,11 @@ class Controller:
                     length = int(self.headers.get('Content-Length', '0'))
                     if length > 4096: raise Invalid('Request too large')
                     body = json.loads(self.rfile.read(length) or b'{}')
-                    if self.path == '/api/state': controller.set_state(body)
-                    elif self.path == '/api/refresh': controller.refresh()
+                    if self.path == '/api/state': controller.set_state(body); value = controller.status()
+                    elif self.path == '/api/refresh': controller.refresh(); value = controller.status()
+                    elif self.path == '/api/test': value = {'results': controller.test_nodes(body.get('node', ''))}
                     else: self.send_error(404); return
-                    self.send_json(200, controller.status())
+                    self.send_json(200, value)
                 except (Invalid, AccessRejected, json.JSONDecodeError) as error:
                     self.send_json(400, {'error': str(error)})
                 except Exception as error:

@@ -26,9 +26,10 @@
 
 ```routeros
 /container/envs/add list=jackett key=SUB1 value="https://vpn.jackett.ru/sub/ВАША_ССЫЛКА"
-/container/envs/add list=jackett key=JACKETT_NETWORK_MODE value=tun
 /container/envs/add list=jackett key=PROVIDER_INTERVAL value=3600
 ```
+
+`JACKETT_NETWORK_MODE=tun` добавлять необязательно: это режим по умолчанию. Укажите `JACKETT_NETWORK_MODE=proxy` только если нужен явный SOCKS/HTTP proxy без прозрачного TUN.
 
 Создайте и запустите контейнер:
 
@@ -42,6 +43,7 @@
 - **Вручную** — всегда использовать выбранный узел;
 - **Авто** — Xray выбирает живой узел с минимальной задержкой;
 - **Резерв** — Xray использует доступный узел и возвращается к выбранному при отсутствии результатов проверки;
+- **Проверить все** — открыть TCP-соединение через SOCKS каждого Xray-узла и показать фактическую задержку либо состояние «Недоступен»;
 - **Обновить подписку** — перечитать исходные SUB/SRV без перезапуска контейнера.
 
 ## Обновление существующего контейнера
