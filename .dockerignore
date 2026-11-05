@@ -1,10 +1,9 @@
 *
 !Dockerfile
-!minimize-python.py
 !bridge.py
-!exec-mihomo.py
+!controller.py
 !bridge-start.sh
-!version-panel.js
-
 !network.py
 !check-network.sh
+!ui
+!ui/**

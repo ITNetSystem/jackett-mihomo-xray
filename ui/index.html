@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>VPN Jackett</title>
+  <link rel="stylesheet" href="./app.css">
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/ui/" aria-label="VPN Jackett — главная">
+      <span class="brand-mark" aria-hidden="true"><img src="./jackett-logo.png" alt=""></span>
+      <span><strong>VPN Jackett</strong><small>Управление маршрутом</small></span>
+    </a>
+    <div class="health"><span id="health-dot"></span><span id="health-text">Подключение…</span></div>
+  </header>
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">СЕТЕВОЙ ШЛЮЗ</p>
+        <h1>Управление<br>подключением</h1>
+        <p class="lede">Выберите режим и узел. Настройки сохраняются после перезапуска контейнера.</p>
+      </div>
+      <button class="refresh" id="refresh" type="button"><span aria-hidden="true">↻</span> Обновить подписку</button>
+    </section>
+
+    <section class="card mode-card" aria-labelledby="mode-heading">
+      <div class="section-heading"><div><p class="eyebrow">МАРШРУТИЗАЦИЯ</p><h2 id="mode-heading">Режим работы</h2></div></div>
+      <div class="segments" role="radiogroup" aria-label="Режим работы">
+        <button data-mode="manual" role="radio" aria-checked="false"><strong>Вручную</strong><small>Выбранный узел</small></button>
+        <button data-mode="auto" role="radio" aria-checked="false"><strong>Авто</strong><small>Минимальная задержка</small></button>
+        <button data-mode="fallback" role="radio" aria-checked="false"><strong>Резерв</strong><small>Доступный узел</small></button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="nodes-heading">
+      <div class="section-heading">
+        <div><p class="eyebrow">ЛОКАЦИИ</p><h2 id="nodes-heading">Доступные узлы</h2></div>
+        <span class="count" id="count">0</span>
+      </div>
+      <div class="nodes" id="nodes" role="radiogroup" aria-label="Выбор узла"></div>
+    </section>
+
+    <section class="system" aria-label="Сведения о системе">
+      <div><span>Ядро</span><strong id="core">Xray</strong></div>
+      <div><span>Версия</span><strong id="version">—</strong></div>
+      <div><span>Обновлено</span><strong id="updated">—</strong></div>
+    </section>
+    <p class="error" id="error" role="alert" hidden></p>
+  </main>
+</body>
+</html>

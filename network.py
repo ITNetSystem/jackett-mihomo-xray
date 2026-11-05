@@ -5,7 +5,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-import yaml
 
 TABLE = '2022'
 PRIORITY = 12000
@@ -32,17 +31,18 @@ def activate(workdir, mode):
     if mode == 'proxy':
         print('Network mode proxy: only explicit HTTP/SOCKS; no interception', flush=True)
         return
-    config = Path(workdir) / os.getenv('CONFIG', 'default_config.yaml')
+    config = Path(workdir) / '.jackett-xray' / 'router.json'
     device = None
     for _ in range(90):
         if config.exists():
-            data = yaml.safe_load(config.read_text()) or {}
-            listener = next((x for x in data.get('listeners', []) if x.get('name') == 'tun-in'), {})
-            if listener.get('type') == 'tun':
-                if listener.get('auto-route') or listener.get('auto-redirect'):
+            data = json.loads(config.read_text())
+            listener = next((x for x in data.get('inbounds', []) if x.get('tag') == 'tun-in'), {})
+            if listener.get('protocol') == 'tun':
+                settings = listener.get('settings', {})
+                if settings.get('autoSystemRoutingTable'):
                     raise RuntimeError('Unsafe automatic TUN routing rejected')
                 links = json.loads(subprocess.check_output(['ip', '-j', 'link'], text=True))
-                wanted = listener.get('device', 'Meta')
+                wanted = settings.get('name', 'xray0')
                 if any(x['ifname'] == wanted for x in links):
                     device = wanted
                     break
@@ -65,10 +65,11 @@ def activate(workdir, mode):
                 if path.exists() and path.read_text().strip() != '0': path.write_text('0')
             run(['ip', family, 'route', 'replace', 'default', 'dev', device, 'table', TABLE])
             existing = json.loads(subprocess.check_output(['ip', family, '-j', 'rule'], text=True))
-            if any(PRIORITY <= x.get('priority', -1) <= PRIORITY + 20 for x in existing):
-                raise RuntimeError('Reserved policy priorities already occupied')
+            priorities = {x.get('priority') for x in existing}
             for rule in policy_rules(interface, family == '-6'):
-                run(['ip', family, 'rule', 'add', *rule])
+                priority = int(rule[1])
+                if priority not in priorities:
+                    run(['ip', family, 'rule', 'add', *rule])
     print('Network mode tun: forwarded traffic only; local sockets use original gateway', flush=True)
 
 if __name__ == '__main__':

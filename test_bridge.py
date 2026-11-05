@@ -31,9 +31,9 @@ class ConversionTests(unittest.TestCase):
         self.assertEqual(c['outbounds'],p['outbounds']);self.assertEqual(c['dns'],p['dns'])
         self.assertEqual(c['routing']['rules'][0]['inboundTag'],['jackett-local'])
         self.assertEqual(c['inbounds'][0]['listen'],'127.0.0.1')
-    def test_native_yaml_keeps_unsupported_parameters(self):
-        a,b=parse_payload('proxies:\n- name: T\n  type: tuic\n  server: example\n  port: 443\n  uuid: test\n  password: private\n','SUB1')
-        self.assertEqual(a,[]);self.assertEqual(b[0]['password'],'private')
+    def test_mihomo_yaml_is_explicitly_rejected(self):
+        with self.assertRaisesRegex(Invalid, 'Xray-only'):
+            parse_payload('proxies:\n- name: T\n  type: tuic\n  server: example\n  port: 443\n','SUB1')
     def test_hysteria2(self):
         _,p=uri_profile('hy2://secret@vpn.example:443?sni=mail.example#H')
         self.assertEqual(p['outbounds'][0]['streamSettings']['hysteriaSettings']['auth'],'secret')
@@ -84,23 +84,17 @@ class ConversionTests(unittest.TestCase):
         from pathlib import Path
         with tempfile.TemporaryDirectory() as work:
             link='vless://'+ID+'@vpn.example:443?security=tls#Same-name'
-            with patch.dict(os.environ,{'WORKDIR':work,'SUB1':link,'SUB2':link,'SRV1':'tuic://user:pass@tuic.example:443#Native'},clear=True):
+            with patch.dict(os.environ,{'WORKDIR':work,'SUB1':link,'SUB2':link},clear=True):
                 b=Bridge()
                 with patch('bridge.subprocess.run',return_value=Mock(returncode=0)),patch('bridge.subprocess.Popen'):
                     b.refresh()
-                self.assertEqual(set(b.providers),{'SUB1','SUB2','SRV1'})
+                self.assertEqual(set(b.providers),{'SUB1','SUB2'})
                 first=json.loads(b.provider_body('SUB1'))['proxies']
                 second=json.loads(b.provider_body('SUB2'))['proxies']
                 self.assertEqual(len(first),1);self.assertEqual(len(second),1)
                 self.assertNotEqual(first[0]['port'],second[0]['port'])
                 self.assertNotEqual(first[0]['name'],second[0]['name'])
-                self.assertTrue(b.provider_body('SRV1').startswith(b'tuic://'))
-                hook=(Path(work)/'user_sh/jackett-all-xray.sh').read_text()
-                for key in ('SUB1','SUB2','SRV1'):
-                    self.assertIn('add_provider '+key+' http',hook)
-                    self.assertIn('/providers/'+key,hook)
-                self.assertNotIn('add_provider JACKETT_XRAY',hook)
-                self.assertNotIn('PROVIDER_INTERVAL=60',hook)
+                self.assertFalse((Path(work)/'user_sh/jackett-all-xray.sh').exists())
 
     def test_on_demand_refresh_is_serialized_and_throttled(self):
         import threading
@@ -112,19 +106,18 @@ class ConversionTests(unittest.TestCase):
         self.assertFalse(b.refresh(min_age=5))
         b._refresh_unlocked.assert_called_once_with()
 
-    def test_start_forces_selected_mode_persistence(self):
+    def test_start_uses_xray_only_controller(self):
         from pathlib import Path
         script=(Path(__file__).parent/'bridge-start.sh').read_text()
-        self.assertIn('export STORE_SELECTED=true',script)
+        self.assertIn('controller.py',script)
+        self.assertNotIn('exec-mihomo',script.lower())
 
-    def test_version_panel_survives_downloaded_ui_replacement(self):
+    def test_version_is_a_normal_part_of_own_ui(self):
         from pathlib import Path
-        script=(Path(__file__).parent/'bridge-start.sh').read_text()
-        panel=(Path(__file__).parent/'version-panel.js').read_text()
-        self.assertIn("marker='jackett-versions.js?v=261031-2'",script)
-        self.assertIn('while :; do',script)
-        self.assertIn('MutationObserver(render)',panel)
-        self.assertIn("badge.textContent = 'Mihomo 1.19.33 · Xray 26.10.31'",panel)
+        html=(Path(__file__).parent/'ui/index.html').read_text()
+        self.assertIn('id="version"',html)
+        self.assertIn('id="core"',html)
+        self.assertNotIn('Mihomo',html)
 
     def test_wireguard_uses_tunnel_dns_and_userspace_stack(self):
         key=base64.b64encode(bytes([251])*32).decode()
@@ -141,15 +134,16 @@ class ConversionTests(unittest.TestCase):
         import os,tempfile,urllib.error
         from unittest.mock import patch,Mock
         with tempfile.TemporaryDirectory() as work:
-            link='tuic://user:pass@tuic.example:443#Native'
+            link='vless://'+ID+'@vpn.example:443?security=tls#Available'
             with patch.dict(os.environ,{'WORKDIR':work,'SRV1':link,'SUB3':'https://private.example/sub'},clear=True):
                 b=Bridge();original=b.fetch
                 def fetch(key,value):
                     if key=='SUB3': raise urllib.error.HTTPError(value,403,'Forbidden',{},None)
                     return original(key,value)
-                with patch.object(b,'fetch',side_effect=fetch): b.refresh()
+                with patch.object(b,'fetch',side_effect=fetch),patch('bridge.subprocess.run',return_value=Mock(returncode=0)),patch('bridge.subprocess.Popen'):
+                    b.refresh()
                 self.assertEqual(json.loads(b.provider_body('SUB3')),{'proxies':[]})
-                self.assertTrue(b.provider_body('SRV1').startswith(b'tuic://'))
+                self.assertEqual(len(json.loads(b.provider_body('SRV1'))['proxies']),1)
                 b.sources={'SUB3':'https://private.example/sub'}
                 with patch.object(b,'fetch',side_effect=fetch),self.assertRaises(Invalid): b.refresh()
 

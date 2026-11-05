@@ -1,48 +1,59 @@
-# Jackett Mihomo + Xray для MikroTik
+# VPN Jackett Xray для MikroTik
 
-Образ: **`ghcr.io/itnetsystem/jackett-mihomo-xray:latest`**.
-Дополнительный образ: **`ghcr.io/itnetsystem/jackett-mihomo-xray:with-ui`** — со встроенным Zashboard 3.29.1, без загрузки GUI при запуске. Поддерживает те же архитектуры, ENV и протоколы. Он больше на размер встроенного интерфейса.
+Xray-only контейнер с собственным контроллером и веб-интерфейсом VPN Jackett.
 
-Имя контейнера: **`jackett-mihomo-xray`**.
+Образ: `ghcr.io/itnetsystem/jackett-mihomo-xray:latest`
 
-Полная сборка: Mihomo 1.19.33 + Xray 26.10.31, ARMv7 (32-bit), ARM64 и AMD64. Версии обоих ядер отображаются в Zashboard. Сохранены SELECTOR, MANUAL, AUTO, FALLBACK, LOADBALANCE, протоколы обоих ядер и базы Xray GeoIP/GeoSite. Ручное обновление provider сразу перечитывает исходную подписку, а выбранный режим и узел MANUAL сохраняются после перезапуска контейнера.
+Версионный тег: `ghcr.io/itnetsystem/jackett-mihomo-xray:xray-26.10.31`
 
-**[Пошаговая инструкция](README-BRIDGE.md)** — сеть, ENV, установка, обновление и удаление.
+Название пакета в GHCR сохранено прежним, чтобы существующие MikroTik могли сделать обычный `repull`. Внутри актуального образа Mihomo отсутствует.
 
-## Настройка через ENV
+## Что умеет
 
-SUB1, SUB2, SUB3 и далее — URL подписок. SRV1, SRV2 и далее — отдельные ссылки, включая WireGuard и SOCKS5. Источники показываются отдельными провайдерами; общие группы включают их все. UI_SECRET необязателен. Подробности SUB_USER_AGENT, HWID и форматов — в инструкции.
+- Xray 26.10.31 и нативный Xray TUN;
+- ARMv7, ARM64 и AMD64;
+- источники `SUB1`, `SUB2`, `SRV1` и `XRAY_JSON1`;
+- режимы «Вручную», «Авто» и «Резерв»;
+- обновление подписки без перезапуска контейнера;
+- сохранение режима и выбранного узла в `root-dir`;
+- собственная панель VPN Jackett на порту 9090;
+- SOCKS5 на порту 1080 и HTTP proxy на 1081.
 
-После подготовки свободного интерфейса и ENV:
+Версия Xray отображается в разделе «Сведения о системе» панели, а не поверх стороннего GUI.
+
+## Быстрый запуск
+
+Создайте ENV-список `jackett` и добавьте хотя бы один источник:
 
 ```routeros
-/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest envlists=jackett interface=veth1jackett root-dir=containers/jackett dns=1.1.1.1 logging=yes start-on-boot=no
+/container/envs/add list=jackett key=SUB1 value="https://vpn.jackett.ru/sub/ВАША_ССЫЛКА"
+/container/envs/add list=jackett key=JACKETT_NETWORK_MODE value=tun
 ```
 
-После загрузки:
+Добавьте контейнер, используя уже настроенный veth-интерфейс:
 
 ```routeros
-/container/start [/container/find where name=jackett-mihomo-xray]
+/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest envlists=jackett interface=veth1jackett root-dir=containers/jackett logging=yes start-on-boot=yes
 ```
 
-RouterOS создаёт папку сам. Отдельные config/tmp, mountlists и xray.json для обычной подписки не нужны. Используйте существующий мост `Docker Bridge`, список ENV `jackett`; не назначайте IP/интерфейс, занятые другим контейнером.
+Полная инструкция и безопасное обновление: [README-BRIDGE.md](README-BRIDGE.md).
 
-## Порты
+## Поддерживаемые данные
 
-- **1080 — общий HTTP/SOCKS прокси**, включая поддерживаемую SOCKS5 UDP-передачу.
-- **9090 — API и GUI**.
-- **53 — DNS Mihomo**, если DNS_ENABLE включён.
+Ссылки VLESS, VMess, Trojan, Shadowsocks, Hysteria2, WireGuard, SOCKS/HTTP и полные Xray JSON-конфигурации преобразуются без передачи секретной ссылки локальному GUI. Служебные `happ://` и `incy://routing/` пропускаются.
 
-GUI: `http://172.31.203.4:9090/ui/#/setup?hostname=172.31.203.4&port=9090&secret=` — замените IP своим, при UI_SECRET заполните Secret. Прозрачная маршрутизация LAN настраивается отдельно на MikroTik.
+Mihomo YAML и специфичные только для Mihomo схемы намеренно отклоняются с понятной ошибкой: контейнер больше не содержит второе ядро и не делает вид, что такой узел работает.
 
-## Размер и хранилище
+## Сеть и отказобезопасность
 
-Ориентировочный размер файловой системы — **160 МиБ**; размер зависит от архитектуры и версии сборки. Стандартная библиотека Python упакована в ZIP; Mihomo, Xray и Geo-базы сохранены. GUI скачивается дополнительно, временная распаковка тоже требует места.
+В режиме `tun` Xray создает `xray0`. Контроллер ставит отдельную таблицу маршрутизации 2022 только для трафика, пришедшего от MikroTik через интерфейс контейнера. Собственные подключения Xray, загрузка подписки и панель продолжают использовать обычный шлюз, поэтому петли маршрутизации нет.
 
-Используйте постоянный накопитель с запасом места для образа, распаковки, конфигураций и веб-панели.
+Новые профили сначала проверяются командой `xray run -test`. Некорректное обновление не заменяет работающий набор. Кэш, HWID, режим и выбранный узел находятся в прежнем каталоге `/etc/mihomo` внутри `root-dir` исключительно для совместимости обновления.
 
-## Сеть
+## Предыдущая версия
 
-Единый режим TUN на всех поддерживаемых архитектурах. В TUN направляются только пакеты, пришедшие от RouterOS. Исходящие соединения Xray и управление контейнером используют обычный шлюз, без повторного перехвата. `TUN_AUTO_ROUTE` и `TUN_AUTO_REDIRECT` принудительно отключены. Для явного HTTP/SOCKS без TUN задайте `JACKETT_NETWORK_MODE=proxy`.
+Последняя комбинированная сборка сохранена под тегом:
 
-[Настройка сети и безопасное обновление](README-BRIDGE.md#как-работает-сеть).
+`ghcr.io/itnetsystem/jackett-mihomo-xray:mihomo-1.19.33-xray-26.10.31`
+
+Тег `with-ui` больше не выпускается и удаляется из GHCR после публикации Xray-only версии.

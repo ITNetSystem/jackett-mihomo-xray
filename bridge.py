@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ENV subscription adapter. Remote credentials never enter the Mihomo provider."""
+"""ENV subscription adapter. Remote credentials never enter the local GUI."""
 import base64
 import copy
 import errno
@@ -20,11 +20,10 @@ import urllib.parse as url
 import urllib.request
 import urllib.error
 import uuid
-import yaml
 
 MAX_BYTES = 8 * 1024 * 1024
 MAX_PROFILES = 64
-NATIVE = {'ssr', 'tuic', 'hysteria', 'anytls', 'ssh', 'snell', 'mieru', 'awg', 'amneziawg'}
+UNSUPPORTED = {'ssr', 'tuic', 'hysteria', 'anytls', 'ssh', 'snell', 'mieru', 'awg', 'amneziawg'}
 
 class Invalid(ValueError):
     pass
@@ -106,7 +105,7 @@ def uri_profile(link):
     if wg:
         link = wg.group(1)+'://'+url.quote(url.unquote(wg.group(2)),safe='')+'@'+link[wg.end():]
     u = url.urlsplit(link)
-    if u.scheme in NATIVE: return None
+    if u.scheme in UNSUPPORTED: return None
     if u.scheme == 'vmess':
         v = json.loads(b64(link[8:]))
         if set(v)-{'v','ps','add','port','id','aid','scy','net','type','host','path','tls','sni','fp','alpn'}: raise Invalid('Unknown VMess option; use Xray JSON')
@@ -172,7 +171,7 @@ def uri_profile(link):
             out={'protocol':'wireguard','settings':settings}
             if q.get('dns'): settings['remoteDNS']=q['dns'].split(',')
         else:
-            raise Invalid('Use Xray JSON or supported Mihomo YAML for this protocol')
+            raise Invalid('Use a supported Xray URI or Xray JSON for this protocol')
     out['tag']='proxy'
     return name, {'outbounds':[out]}
 
@@ -192,10 +191,7 @@ def parse_payload(text, source):
             result.append((str(name),item))
         return result, []
     if text.startswith('proxies:') or '\nproxies:' in text:
-        # Keep native YAML intact rather than silently dropping unsupported options.
-        p=yaml.safe_load(text)
-        if not isinstance(p,dict) or not isinstance(p.get('proxies'),list): raise Invalid('Invalid Mihomo YAML')
-        return [], p['proxies']
+        raise Invalid('Mihomo YAML is not supported by the Xray-only image')
     if '://' not in text:
         text=b64(''.join(text.split()))
         if text.lstrip().startswith(('{','[')): return parse_payload(text,source)
@@ -322,18 +318,8 @@ class Bridge:
                 proc=subprocess.Popen(['/usr/local/bin/xray','run','-config',str(path)])
                 self.running[port]=(proc,digest)
         self.proxies=proxies;self.native=native;self.providers=providers
-        hook=['[ -n "$PROVIDERS_BLOCK" ] || PROVIDERS_LIST=""']
-        for key in sorted(providers):
-            hook.append('add_provider '+key+' http http://127.0.0.1:18890/providers/'+key+' false')
-            hook.append('PROVIDERS_BLOCK="${PROVIDERS_BLOCK}    proxy: DIRECT\n"')
-        hook.append('[ "$JACKETT_NETWORK_MODE" != proxy ] || export TUN_IN_AUTOCONFIG=""')
-        hook_path=self.work/'user_sh'/'jackett-all-xray.sh'
-        hook_path.parent.mkdir(parents=True,exist_ok=True)
-        hook_path.write_text('\n'.join(hook)+'\n')
         atomic(self.state/'ports.json',self.mapping)
-        atomic(self.work/'jackett-native.json',{'proxies':[x for x in native if isinstance(x,dict)]})
-        (self.work/'jackett-native-links.txt').write_text('\n'.join(x for x in native if isinstance(x,str)))
-        print('Bridge ready: '+str(len(proxies))+' Xray connections, '+str(len(native))+' native Mihomo entries',flush=True)
+        print('Bridge ready: '+str(len(proxies))+' Xray connections',flush=True)
 
     def shutdown(self):
         self.stop.set()
@@ -359,7 +345,7 @@ class Bridge:
                 if self.path=='/ready':
                     body=b'{"ready":true}'
                 elif self.path.startswith('/providers/') and self.path[11:] in bridge.providers:
-                    # A provider refresh requested in Zashboard must also fetch
+                    # A compatibility provider refresh must also fetch
                     # the upstream subscription. Previously it only reread this
                     # bridge's old snapshot, so changes appeared after restart.
                     # Closely grouped provider pulls share one upstream refresh.
