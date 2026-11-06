@@ -18,6 +18,6 @@ LABEL org.opencontainers.image.title="VPN Jackett Xray"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV XRAY_LOCATION_ASSET=/usr/local/share/xray
 ENV JACKETT_XRAY_VERSION=26.10.31
-ENV WORKDIR=/etc/mihomo
+ENV WORKDIR=/etc/jackett-xray
 EXPOSE 1080 1081 9090
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/jackett-bridge-start"]

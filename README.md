@@ -2,11 +2,11 @@
 
 Xray-only контейнер с собственным контроллером и веб-интерфейсом VPN Jackett.
 
-Образ: `ghcr.io/itnetsystem/jackett-mihomo-xray:latest`
+Образ: `ghcr.io/itnetsystem/jackett-xray:latest`
 
-Версионный тег: `ghcr.io/itnetsystem/jackett-mihomo-xray:xray-26.10.31`
+Версионный тег: `ghcr.io/itnetsystem/jackett-xray:xray-26.10.31`
 
-Название пакета в GHCR сохранено прежним, чтобы существующие MikroTik могли сделать обычный `repull`. Внутри актуального образа Mihomo отсутствует.
+Старый адрес образа получает только совместимый `latest` на время миграции существующих MikroTik. Новые установки и документация используют имя `jackett-xray`.
 
 ## Что умеет
 
@@ -35,7 +35,7 @@ Xray-only контейнер с собственным контроллером 
 Добавьте контейнер, используя уже настроенный veth-интерфейс:
 
 ```routeros
-/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest envlists=jackett interface=veth1jackett root-dir=containers/jackett logging=yes start-on-boot=yes
+/container/add name=jackett-xray remote-image=ghcr.io/itnetsystem/jackett-xray:latest envlists=jackett interface=veth1jackett root-dir=containers/jackett logging=yes start-on-boot=yes
 ```
 
 Полная инструкция и безопасное обновление: [README-BRIDGE.md](README-BRIDGE.md).
@@ -44,13 +44,13 @@ Xray-only контейнер с собственным контроллером 
 
 Ссылки VLESS, VMess, Trojan, Shadowsocks, Hysteria2, WireGuard, SOCKS/HTTP и полные Xray JSON-конфигурации преобразуются без передачи секретной ссылки локальному GUI. Служебные `happ://` и `incy://routing/` пропускаются.
 
-Mihomo YAML и специфичные только для Mihomo схемы намеренно отклоняются с понятной ошибкой: контейнер больше не содержит второе ядро и не делает вид, что такой узел работает.
+YAML-профили Clash и схемы, несовместимые с Xray, отклоняются с понятной ошибкой: контейнер не делает вид, что неподдерживаемый узел работает.
 
 ## Сеть и отказобезопасность
 
 В режиме `tun` Xray создает `xray0`. Контроллер ставит отдельную таблицу маршрутизации 2022 только для трафика, пришедшего от MikroTik через интерфейс контейнера. Собственные подключения Xray, загрузка подписки и панель продолжают использовать обычный шлюз, поэтому петли маршрутизации нет.
 
-Новые профили сначала проверяются командой `xray run -test`. Некорректное обновление не заменяет работающий набор. Кэш, HWID, режим и выбранный узел находятся в прежнем каталоге `/etc/mihomo` внутри `root-dir` исключительно для совместимости обновления.
+Новые профили сначала проверяются командой `xray run -test`. Некорректное обновление не заменяет работающий набор. Кэш, HWID, режим и выбранный узел хранятся в `/etc/jackett-xray`; при первом запуске состояние старой установки переносится автоматически и без удаления исходных файлов.
 
 ## Предыдущая версия
 

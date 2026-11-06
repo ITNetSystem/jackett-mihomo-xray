@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock
 
-from controller import Controller, country_for, flag_for
+from controller import Controller, country_for
 
 
 class ControllerTests(unittest.TestCase):
@@ -41,15 +41,14 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(country_for('RS Сербия - TCP'),('RS','Сербия'))
         self.assertEqual(country_for('Estonia XHTTP'),('EE','Эстония'))
         self.assertEqual(country_for('Custom node'),('','Локация'))
-        self.assertEqual(flag_for('RO'),'🇷🇴')
         nodes=self.controller().nodes()
         self.assertEqual(nodes[0]['countryCode'],'RS')
-        self.assertEqual(nodes[1]['flag'],'🇪🇪')
+        self.assertEqual(nodes[1]['country'],'Эстония')
 
     def test_connection_probe_uses_node_socks_listener(self):
         from unittest.mock import patch
         class Connection:
-            def __init__(self): self.data=bytearray(b'\x05\x00\x05\x00\x00\x01\x7f\x00\x00\x01\x01\xbb')
+            def __init__(self): self.data=bytearray(b'\x05\x00\x05\x00\x00\x01\x7f\x00\x00\x01\x01\xbbHTTP/1.1 204 No Content\r\n\r\n')
             def __enter__(self): return self
             def __exit__(self,*_): pass
             def settimeout(self,_): pass
@@ -57,7 +56,8 @@ class ControllerTests(unittest.TestCase):
             def recv(self,length):
                 result=self.data[:length];del self.data[:length];return bytes(result)
         c=self.controller()
-        with patch('controller.socket.create_connection',return_value=Connection()) as connect:
+        with patch.dict('os.environ',{'JACKETT_PROBE_URL':'http://connectivitycheck.gstatic.com/generate_204'}), \
+             patch('controller.socket.create_connection',return_value=Connection()) as connect:
             result=c.probe_node(c.nodes()[0])
         self.assertTrue(result['ok'])
         connect.assert_called_once_with(('127.0.0.1',20000),timeout=8)

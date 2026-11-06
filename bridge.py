@@ -191,7 +191,7 @@ def parse_payload(text, source):
             result.append((str(name),item))
         return result, []
     if text.startswith('proxies:') or '\nproxies:' in text:
-        raise Invalid('Mihomo YAML is not supported by the Xray-only image')
+        raise Invalid('Clash YAML is not supported by the Xray-only image')
     if '://' not in text:
         text=b64(''.join(text.split()))
         if text.lstrip().startswith(('{','[')): return parse_payload(text,source)
@@ -227,7 +227,7 @@ def atomic(path,value):
 class Bridge:
     def __init__(self):
         os.umask(0o077)
-        self.work=Path(os.getenv('WORKDIR','/etc/mihomo'))
+        self.work=Path(os.getenv('WORKDIR','/etc/jackett-xray'))
         self.state=self.work/'.jackett-xray';self.state.mkdir(parents=True,exist_ok=True)
         self.running={};self.proxies=[];self.native=[];self.providers={};self.stop=threading.Event()
         self.refresh_lock=threading.Lock();self.last_refresh=0.0

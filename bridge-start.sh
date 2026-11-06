@@ -2,11 +2,17 @@
 set -eu
 : "${PATH:=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
 export PATH
-: "${WORKDIR:=/etc/mihomo}"
+: "${WORKDIR:=/etc/jackett-xray}"
 export WORKDIR
 export JACKETT_NETWORK_MODE="${JACKETT_NETWORK_MODE:-tun}"
 case "$JACKETT_NETWORK_MODE" in tun|proxy) ;; *) echo 'Invalid network mode'; exit 1;; esac
 mkdir -p "$WORKDIR"
+# One-time, non-destructive migration from releases that stored state in the
+# former core-named directory. The old directory remains available for rollback.
+if [ "$WORKDIR" = /etc/jackett-xray ] && [ -d /etc/mihomo ] && [ ! -e "$WORKDIR/.jackett-xray" ]; then
+    [ ! -d /etc/mihomo/.jackett-xray ] || cp -a /etc/mihomo/.jackett-xray "$WORKDIR/"
+    [ ! -f /etc/mihomo/.hwid ] || cp -p /etc/mihomo/.hwid "$WORKDIR/.hwid"
+fi
 
 python3 /usr/local/lib/jackett/controller.py &
 controller_pid=$!

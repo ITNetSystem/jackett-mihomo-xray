@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import signal
 import socket
+import ssl
 import subprocess
 import threading
 import time
@@ -50,14 +51,10 @@ def country_for(name):
     return '', 'Локация'
 
 
-def flag_for(code):
-    return ''.join(chr(127397 + ord(char)) for char in code) if code else '◎'
-
-
 class Controller:
     def __init__(self):
         os.umask(0o077)
-        self.work = Path(os.getenv('WORKDIR', '/etc/mihomo'))
+        self.work = Path(os.getenv('WORKDIR', '/etc/jackett-xray'))
         self.state_dir = self.work / '.jackett-xray'
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.ui_dir = Path('/usr/local/share/jackett-ui')
@@ -88,7 +85,7 @@ class Controller:
             name = re.sub(r'^\[Xray\]\s*', '', proxy['name'])
             code, country = country_for(name)
             result.append({'id': self.node_id(proxy), 'name': name, 'port': proxy['port'],
-                           'countryCode': code, 'country': country, 'flag': flag_for(code)})
+                           'countryCode': code, 'country': country})
         return result
 
     @staticmethod
@@ -106,6 +103,9 @@ class Controller:
         port = probe.port or (443 if probe.scheme == 'https' else 80)
         encoded = host.encode('idna')
         if len(encoded) > 255: raise Invalid('Probe hostname is too long')
+        path = probe.path or '/'
+        if probe.query:
+            path += '?' + probe.query
         started = time.monotonic()
         try:
             with socket.create_connection(('127.0.0.1', node['port']), timeout=8) as connection:
@@ -119,6 +119,21 @@ class Controller:
                 if header[3] == 3: address_length = self._recv_exact(connection, 1)[0]
                 if address_length is None: raise OSError('Invalid SOCKS5 response')
                 self._recv_exact(connection, address_length + 2)
+                stream = connection
+                if probe.scheme == 'https':
+                    stream = ssl.create_default_context().wrap_socket(connection, server_hostname=host)
+                    stream.settimeout(8)
+                request = ('GET ' + path + ' HTTP/1.1\r\nHost: ' + host +
+                           '\r\nUser-Agent: VPN-Jackett-Xray/1.0\r\nAccept: */*\r\nConnection: close\r\n\r\n')
+                stream.sendall(request.encode('ascii'))
+                response = bytearray()
+                while b'\r\n\r\n' not in response and len(response) < 16384:
+                    chunk = stream.recv(2048)
+                    if not chunk: break
+                    response.extend(chunk)
+                status = response.split(b'\r\n', 1)[0]
+                if not re.match(br'^HTTP/\d(?:\.\d)? [23]\d\d(?: |$)', status):
+                    raise OSError('Probe HTTP request failed')
             return {'id': node['id'], 'ok': True, 'latency': round((time.monotonic() - started) * 1000)}
         except (OSError, TimeoutError):
             return {'id': node['id'], 'ok': False, 'latency': None}
@@ -204,7 +219,7 @@ class Controller:
             before = [(x.get('name'), x.get('port')) for x in self.bridge.proxies]
             self.bridge.refresh()
             if self.bridge.native:
-                raise Invalid('Mihomo-only subscription entries are not supported by the Xray-only image')
+                raise Invalid('This subscription format is not supported by the Xray-only image')
             after = [(x.get('name'), x.get('port')) for x in self.bridge.proxies]
             if initial or before != after:
                 self.restart_router()

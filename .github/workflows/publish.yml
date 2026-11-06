@@ -43,13 +43,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Determine image name
         id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/jackett-xray" >> "$GITHUB_OUTPUT"
+          echo "legacy=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
       - name: Preserve previous combined release
         run: |
-          if ! docker buildx imagetools inspect "${{ steps.image.outputs.name }}:mihomo-1.19.33-xray-26.10.31" >/dev/null 2>&1; then
+          if ! docker buildx imagetools inspect "${{ steps.image.outputs.legacy }}:mihomo-1.19.33-xray-26.10.31" >/dev/null 2>&1; then
             docker buildx imagetools create \
-              --tag "${{ steps.image.outputs.name }}:mihomo-1.19.33-xray-26.10.31" \
-              "${{ steps.image.outputs.name }}:latest"
+              --tag "${{ steps.image.outputs.legacy }}:mihomo-1.19.33-xray-26.10.31" \
+              "${{ steps.image.outputs.legacy }}:latest"
           fi
       - name: Validate all architectures
         run: |
@@ -88,6 +90,7 @@ jobs:
           tags: |
             ${{ steps.image.outputs.name }}:latest
             ${{ steps.image.outputs.name }}:xray-26.10.31
+            ${{ steps.image.outputs.legacy }}:latest
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}

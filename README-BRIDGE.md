@@ -34,8 +34,8 @@
 Создайте и запустите контейнер:
 
 ```routeros
-/container/add name=jackett-mihomo-xray remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest envlists=jackett interface=veth1jackett root-dir=containers/jackett logging=yes start-on-boot=yes
-/container/start [/container/find where name=jackett-mihomo-xray]
+/container/add name=jackett-xray remote-image=ghcr.io/itnetsystem/jackett-xray:latest envlists=jackett interface=veth1jackett root-dir=containers/jackett logging=yes start-on-boot=yes
+/container/start [/container/find where name=jackett-xray]
 ```
 
 Откройте `http://172.20.0.2:9090/ui/`. В панели доступны:
@@ -43,25 +43,25 @@
 - **Вручную** — всегда использовать выбранный узел;
 - **Авто** — Xray выбирает живой узел с минимальной задержкой;
 - **Резерв** — Xray использует доступный узел и возвращается к выбранному при отсутствии результатов проверки;
-- **Проверить все** — открыть TCP-соединение через SOCKS каждого Xray-узла и показать фактическую задержку либо состояние «Недоступен»;
+- **Проверить все** — выполнить через каждый Xray-узел полный SOCKS + TLS + HTTP-запрос и показать фактическую задержку либо состояние «Нет ответа»;
 - **Обновить подписку** — перечитать исходные SUB/SRV без перезапуска контейнера.
 
 ## Обновление существующего контейнера
 
-Старый `root-dir` сохраняйте: путь `/etc/mihomo` оставлен внутри образа специально для совместимости данных. ENV с параметрами стороннего интерфейса больше не нужен и игнорируется.
+Старый `root-dir` сохраняйте: при первом запуске данные автоматически копируются в `/etc/jackett-xray`, исходное состояние остаётся доступно для отката. ENV с параметрами стороннего интерфейса больше не нужен и игнорируется. Для установки со старым именем сначала переименуйте контейнер и смените образ:
 
 ```routeros
 /container/set [/container/find where name=jackett-mihomo-xray] start-on-boot=no
 /container/stop [/container/find where name=jackett-mihomo-xray]
-/container/set [/container/find where name=jackett-mihomo-xray] remote-image=ghcr.io/itnetsystem/jackett-mihomo-xray:latest
-/container/repull [/container/find where name=jackett-mihomo-xray]
-/container/start [/container/find where name=jackett-mihomo-xray]
+/container/set [/container/find where name=jackett-mihomo-xray] name=jackett-xray remote-image=ghcr.io/itnetsystem/jackett-xray:latest
+/container/repull [/container/find where name=jackett-xray]
+/container/start [/container/find where name=jackett-xray]
 ```
 
 После проверки:
 
 ```routeros
-/container/set [/container/find where name=jackett-mihomo-xray] start-on-boot=yes
+/container/set [/container/find where name=jackett-xray] start-on-boot=yes
 ```
 
 Если нужен откат, предыдущая комбинированная сборка сохранена как:
@@ -83,7 +83,7 @@
 ## Диагностика
 
 ```routeros
-/container/print detail where name=jackett-mihomo-xray
+/container/print detail where name=jackett-xray
 /log/print where message~"jackett|Xray|container"
 ```
 

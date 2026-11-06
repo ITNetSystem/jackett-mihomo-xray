@@ -2,53 +2,92 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="color-scheme" content="dark">
-  <title>VPN Jackett</title>
-  <link rel="stylesheet" href="./app.css?v=261105-2">
-  <script defer src="./app.js?v=261105-2"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f6fa">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c1018">
+  <meta name="color-scheme" content="light dark">
+  <title>VPN Jackett Xray</title>
+  <link rel="stylesheet" href="./app.css?v=261106-1">
+  <script defer src="./app.js?v=261106-1"></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/ui/" aria-label="VPN Jackett — главная">
-      <span class="brand-mark" aria-hidden="true"><img src="./jackett-logo.png" alt=""></span>
-      <span><strong>VPN Jackett</strong><small>Управление маршрутом</small></span>
+    <a class="brand" href="/ui/" aria-label="VPN Jackett Xray — главная">
+      <img src="./jackett-logo.png" alt="" width="40" height="40">
+      <span><strong>VPN Jackett</strong><small>Xray для MikroTik</small></span>
     </a>
-    <div class="health"><span id="health-dot"></span><span id="health-text">Подключение…</span></div>
+    <div class="topbar-actions">
+      <div class="health" role="status"><span class="health-dot" id="health-dot"></span><span id="health-text">Подключение…</span></div>
+      <button class="icon-button" id="theme-toggle" type="button" aria-label="Переключить тему">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42m0-12.72-1.42 1.42M7.06 16.94l-1.42 1.42M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg>
+      </button>
+    </div>
   </header>
+
   <main>
-    <section class="hero">
+    <header class="page-heading">
       <div>
-        <p class="eyebrow">СЕТЕВОЙ ШЛЮЗ</p>
-        <h1>Управление<br>подключением</h1>
-        <p class="lede">Выберите режим и узел. Настройки сохраняются после перезапуска контейнера.</p>
+        <h1>Маршрут VPN Jackett</h1>
+        <p>Выберите страну вручную или доверьте Xray автоматический выбор доступного маршрута.</p>
       </div>
-      <button class="refresh" id="refresh" type="button"><span aria-hidden="true">↻</span> Обновить подписку</button>
+      <button class="button secondary" id="refresh" type="button">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 5v6h-6"/></svg>
+        <span>Обновить подписку</span>
+      </button>
+    </header>
+
+    <section class="route-overview" aria-labelledby="route-heading">
+      <div class="active-route">
+        <span class="route-visual" id="active-visual" aria-hidden="true"><span>—</span></span>
+        <div>
+          <span class="label">Сейчас используется</span>
+          <h2 id="route-heading">Загрузка маршрута…</h2>
+          <p id="route-detail">Получаем состояние Xray</p>
+        </div>
+      </div>
+      <dl class="quick-status">
+        <div><dt>Режим</dt><dd id="active-mode">—</dd></div>
+        <div><dt>Узлов</dt><dd id="count">—</dd></div>
+        <div><dt>Обновлено</dt><dd id="updated">—</dd></div>
+      </dl>
     </section>
 
-    <section class="card mode-card" aria-labelledby="mode-heading">
-      <div class="section-heading"><div><p class="eyebrow">МАРШРУТИЗАЦИЯ</p><h2 id="mode-heading">Режим работы</h2></div></div>
-      <div class="segments" role="radiogroup" aria-label="Режим работы">
-        <button data-mode="manual" role="radio" aria-checked="false"><strong>Вручную</strong><small>Выбранный узел</small></button>
-        <button data-mode="auto" role="radio" aria-checked="false"><strong>Авто</strong><small>Минимальная задержка</small></button>
-        <button data-mode="fallback" role="radio" aria-checked="false"><strong>Резерв</strong><small>Доступный узел</small></button>
-      </div>
-    </section>
+    <div class="workspace">
+      <section class="surface locations" aria-labelledby="nodes-heading">
+        <div class="section-heading">
+          <div><h2 id="nodes-heading">Доступные страны</h2><p>Проверка выполняет полный HTTP-запрос через выбранный маршрут.</p></div>
+          <button class="button compact" id="test-all" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 17l4-5 4 3 6-8m0 0h-5m5 0v5"/></svg>
+            <span>Проверить все</span>
+          </button>
+        </div>
+        <div class="nodes" id="nodes" role="radiogroup" aria-label="Выбор страны">
+          <div class="loading-state" role="status"><span></span><span></span><span></span></div>
+        </div>
+      </section>
 
-    <section class="card" aria-labelledby="nodes-heading">
-      <div class="section-heading">
-        <div><p class="eyebrow">ЛОКАЦИИ</p><h2 id="nodes-heading">Доступные узлы</h2></div>
-        <div class="section-actions"><span class="count" id="count">0</span><button class="test-all" id="test-all" type="button">Проверить все</button></div>
-      </div>
-      <div class="nodes" id="nodes" role="radiogroup" aria-label="Выбор узла"></div>
-    </section>
+      <aside class="surface settings" aria-labelledby="mode-heading">
+        <div class="section-heading"><div><h2 id="mode-heading">Режим маршрута</h2><p>Настройка сохраняется после перезапуска.</p></div></div>
+        <div class="segments" role="radiogroup" aria-label="Режим маршрута">
+          <button data-mode="manual" role="radio" aria-checked="false">
+            <span class="radio-mark"></span><span><strong>Вручную</strong><small>Всегда выбранная страна</small></span>
+          </button>
+          <button data-mode="auto" role="radio" aria-checked="false">
+            <span class="radio-mark"></span><span><strong>Авто</strong><small>Маршрут с меньшей задержкой</small></span>
+          </button>
+          <button data-mode="fallback" role="radio" aria-checked="false">
+            <span class="radio-mark"></span><span><strong>Резерв</strong><small>Переключение при недоступности</small></span>
+          </button>
+        </div>
+        <div class="core-status">
+          <div><span class="status-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 3-3 9h6l-2 9 10-12h-6l2-6Z"/></svg></span><span><small>Ядро</small><strong id="core">Xray</strong></span></div>
+          <div><small>Версия</small><strong id="version">—</strong></div>
+        </div>
+      </aside>
+    </div>
 
-    <section class="system" aria-label="Сведения о системе">
-      <div><span>Ядро</span><strong id="core">Xray</strong></div>
-      <div><span>Версия</span><strong id="version">—</strong></div>
-      <div><span>Обновлено</span><strong id="updated">—</strong></div>
-    </section>
     <p class="error" id="error" role="alert" hidden></p>
+    <p class="sr-only" id="announcer" aria-live="polite"></p>
   </main>
 </body>
 </html>

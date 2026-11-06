@@ -2,9 +2,11 @@ private/
 *.tar
 *.tar.gz
 xray.json
-mihomo.yaml
+clash.yaml
 .env
 
 __pycache__/
 *.pyc
 .jackett-xray/
+.impeccable/review/
+.impeccable/hook.cache.json

@@ -73,4 +73,4 @@ def activate(workdir, mode):
     print('Network mode tun: forwarded traffic only; local sockets use original gateway', flush=True)
 
 if __name__ == '__main__':
-    activate(os.getenv('WORKDIR', '/etc/mihomo'), os.getenv('JACKETT_NETWORK_MODE', 'tun'))
+    activate(os.getenv('WORKDIR', '/etc/jackett-xray'), os.getenv('JACKETT_NETWORK_MODE', 'tun'))
