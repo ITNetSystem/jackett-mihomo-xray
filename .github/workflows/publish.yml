@@ -57,7 +57,7 @@ jobs:
         run: |
           for platform in linux/arm/v7 linux/arm64 linux/amd64; do
             docker buildx build --target runtime --platform "$platform" --load -t jackett-xray-check:local .
-            docker run --rm --platform "$platform" --entrypoint /usr/local/bin/xray jackett-xray-check:local version | grep -q '^Xray 26\.10\.31 '
+            docker run --rm --platform "$platform" --entrypoint /usr/local/bin/xray jackett-xray-check:local version | grep -q '^Xray 26\.11\.9 '
             if docker run --rm --platform "$platform" --entrypoint sh jackett-xray-check:local -c 'command -v mihomo'; then
               echo 'Mihomo must not exist in the Xray-only image' >&2
               exit 1
@@ -89,7 +89,7 @@ jobs:
           sbom: false
           tags: |
             ${{ steps.image.outputs.name }}:latest
-            ${{ steps.image.outputs.name }}:xray-26.10.31
+            ${{ steps.image.outputs.name }}:xray-26.11.9
             ${{ steps.image.outputs.legacy }}:latest
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

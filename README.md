@@ -4,13 +4,13 @@ Xray-only контейнер с собственным контроллером 
 
 Образ: `ghcr.io/itnetsystem/jackett-xray:latest`
 
-Версионный тег: `ghcr.io/itnetsystem/jackett-xray:xray-26.10.31`
+Версионный тег: `ghcr.io/itnetsystem/jackett-xray:xray-26.11.9`
 
 Старый адрес образа получает только совместимый `latest` на время миграции существующих MikroTik. Новые установки и документация используют имя `jackett-xray`.
 
 ## Что умеет
 
-- Xray 26.10.31 и нативный Xray TUN;
+- Xray 26.11.9 и нативный Xray TUN;
 - ARMv7, ARM64 и AMD64;
 - источники `SUB1`, `SUB2`, `SRV1` и `XRAY_JSON1`;
 - режимы «Вручную», «Авто» и «Резерв»;
